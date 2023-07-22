@@ -8,7 +8,7 @@ import subprocess
 
 def copy_file_contents_to_clipboard(file_path, include_header=False):
     """
-    Copies the contents of a file to the clipboard using the xclip command.
+    Copies the contents of a file to the clipboard using the specified clipboard tool.
 
     Args:
         file_path (str): The path of the file to copy.
@@ -27,12 +27,13 @@ def copy_file_contents_to_clipboard(file_path, include_header=False):
             header = f"=== File: {file_path} ===\n"
             file_contents = header + file_contents
 
-        # Use the xclip command to copy the file contents to the clipboard
-        subprocess.run(['xclip', '-selection', 'clipboard'], input=file_contents, encoding='utf-8', check=True)
+        # Use the clipboard tool to copy the file contents
+        clipboard_tool = 'xclip'  # Change this to the appropriate clipboard tool for your system
+        subprocess.run([clipboard_tool, '-selection', 'clipboard'], input=file_contents, encoding='utf-8', check=True)
 
         return True
     except FileNotFoundError:
-        print(f"File '{file_path}' not found.")
+        print(f"Error: File '{file_path}' not found.")
         return False
     except subprocess.CalledProcessError as e:
         print(f"Error: Failed to copy file contents to clipboard. Command returned non-zero exit status {e.returncode}.")
