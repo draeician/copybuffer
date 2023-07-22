@@ -3,7 +3,7 @@
 # author: draeician (July 22, 2023)
 # purpose: allow for a file to be placed in the system clipboard quickly and easily
 
-import sys
+import argparse
 import subprocess
 
 def copy_file_contents_to_clipboard(file_path, include_header=False):
@@ -38,13 +38,16 @@ def copy_file_contents_to_clipboard(file_path, include_header=False):
         print(f"Error: Failed to copy file contents to clipboard. Command returned non-zero exit status {e.returncode}.")
         return False
 
+def main():
+    parser = argparse.ArgumentParser(description="Copy file contents to clipboard.")
+    parser.add_argument("file_path", help="Path of the file to copy.")
+    parser.add_argument("--header", action="store_true", help="Include a header with the filename.")
+    args = parser.parse_args()
+
+    copy_successful = copy_file_contents_to_clipboard(args.file_path, args.header)
+    if copy_successful:
+        print("File contents copied to the clipboard successfully!")
+
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("Please provide the file path as a command-line argument.")
-    else:
-        file_path = sys.argv[1]
-        include_header = False
-        if "--header" in sys.argv:
-            include_header = True
-        copy_file_contents_to_clipboard(file_path, include_header)
+    main()
 
