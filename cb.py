@@ -5,10 +5,12 @@
 
 import argparse
 import subprocess
+import os
+import pyperclip
 
 def copy_file_contents_to_clipboard(file_path, include_header=False):
     """
-    Copies the contents of a file to the clipboard using the specified clipboard tool.
+    Copies the contents of a file to the clipboard using the pyperclip library.
 
     Args:
         file_path (str): The path of the file to copy.
@@ -18,6 +20,9 @@ def copy_file_contents_to_clipboard(file_path, include_header=False):
         bool: True if the file exists and its contents are copied successfully, False otherwise.
     """
     try:
+        # Get the absolute path of the file
+        file_path = os.path.abspath(file_path)
+
         # Verify if the file exists
         with open(file_path, 'r') as file:
             file_contents = file.read().strip()
@@ -27,17 +32,17 @@ def copy_file_contents_to_clipboard(file_path, include_header=False):
             header = f"=== File: {file_path} ===\n"
             file_contents = header + file_contents
 
-        # Use the clipboard tool to copy the file contents
-        clipboard_tool = 'xclip'  # Change this to the appropriate clipboard tool for your system
-        subprocess.run([clipboard_tool, '-selection', 'clipboard'], input=file_contents, encoding='utf-8', check=True)
+        # Use pyperclip to copy the file contents
+        pyperclip.copy(file_contents)
 
         return True
     except FileNotFoundError:
         print(f"Error: File '{file_path}' not found.")
         return False
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Failed to copy file contents to clipboard. Command returned non-zero exit status {e.returncode}.")
+    except Exception as e:
+        print(f"Error: An unexpected error occurred. {str(e)}")
         return False
+
 
 def main():
     parser = argparse.ArgumentParser(description="Copy file contents to clipboard.")
