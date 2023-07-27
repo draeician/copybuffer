@@ -1,56 +1,70 @@
 #!/usr/bin/env python3
 # filename: cb.py
 # author: draeician (July 22, 2023)
-# purpose: allow for a file to be placed in the system clipboard quickly and easily
+# purpose: allow for files to be placed in the system clipboard quickly and easily
 
 import argparse
 import subprocess
 import os
 import pyperclip
 
-def copy_file_contents_to_clipboard(file_path, include_header=False):
+def copy_file_contents_to_clipboard(file_paths, include_header=False):
     """
-    Copies the contents of a file to the clipboard using the pyperclip library.
+    Copies the contents of files to the clipboard using the pyperclip library.
 
     Args:
-        file_path (str): The path of the file to copy.
+        file_paths (list): List of file paths to copy.
         include_header (bool): Flag to indicate whether to include a header with the filename.
 
     Returns:
-        bool: True if the file exists and its contents are copied successfully, False otherwise.
+        bool: True if all files exist and their contents are copied successfully, False otherwise.
     """
     try:
-        # Get the absolute path of the file
-        file_path = os.path.abspath(file_path)
+        copied_all_files = True
+        all_file_contents = ""
 
-        # Verify if the file exists
-        with open(file_path, 'r') as file:
-            file_contents = file.read().strip()
+        for file_path in file_paths:
+            # Get the absolute path of the file
+            file_path = os.path.abspath(file_path)
 
-        # Include header if specified
-        if include_header:
-            header = f"=== File: {file_path} ===\n"
-            file_contents = header + file_contents
+            # Verify if the file exists
+            try:
+                with open(file_path, 'r') as file:
+                    file_contents = file.read().strip()
 
-        # Use pyperclip to copy the file contents
-        pyperclip.copy(file_contents)
+                # Include header if specified
+                if include_header:
+                    header = f"=== File: {file_path} ===\n"
+                    file_contents = header + file_contents
 
-        return True
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.")
-        return False
+                # Add the file contents to the combined string
+                all_file_contents += file_contents + "\n\n"
+
+            except FileNotFoundError:
+                print(f"Error: File '{file_path}' not found.")
+                copied_all_files = False
+
+        # Use pyperclip to copy the combined file contents
+        pyperclip.copy(all_file_contents)
+
+        return copied_all_files
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
         return False
 
-
 def main():
+    # define debug mode
+    debug = False
+
     parser = argparse.ArgumentParser(description="Copy file contents to clipboard.")
-    parser.add_argument("file_path", help="Path of the file to copy.")
-    parser.add_argument("--header", action="store_true", help="Include a header with the filename.")
+    parser.add_argument("file_paths", metavar='N', nargs="+", help="Paths of the files to copy.")
+    parser.add_argument("--header", action="store_true", help="Include header.")
     args = parser.parse_args()
 
-    copy_successful = copy_file_contents_to_clipboard(args.file_path, args.header)
+    if debug:
+        print(args.file_paths)
+
+    copy_successful = copy_file_contents_to_clipboard(args.file_paths, args.header)
     if copy_successful:
         print("File contents copied to the clipboard successfully!")
 
