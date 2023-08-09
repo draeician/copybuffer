@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 import shutil
 
-__VERSION__ = "v1.0-1-g668896f"
+__VERSION__ = "v1.0-2-g3cbb90b"
 
 def is_xclip_installed():
     return shutil.which("xclip") is not None
@@ -78,9 +78,14 @@ def copy_file_contents_to_clipboard(file_paths, include_header=False):
 def main():
     debug = False
     parser = argparse.ArgumentParser(description="Copy file contents or images to clipboard.")
-    parser.add_argument("file_paths", metavar='N', nargs="+", help="Paths of the files or images to copy.")
+    parser.add_argument("--version", action="store_true", help="Display the application version.")
     parser.add_argument("--header", action="store_true", help="Include header for text files.")
+    parser.add_argument("file_paths", metavar='N', nargs='*', help="Paths of the files or images to copy.")  # Changed nargs='*'
     args = parser.parse_args()
+
+    if args.version:
+        print(f"This is the CopyBuffer application, version {__VERSION__}")
+        return
 
     if debug:
         print(args.file_paths)
