@@ -9,6 +9,8 @@ import tempfile
 import subprocess
 import shutil
 
+__VERSION__ = "v1.0-1-g668896f"
+
 def is_xclip_installed():
     return shutil.which("xclip") is not None
 
