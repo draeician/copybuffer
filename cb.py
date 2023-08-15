@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 import shutil
 
-__VERSION__ = "v1.0-2-g3cbb90b"
+__VERSION__ = "v1.0-3-g423b6c9"
 
 def is_xclip_installed():
     return shutil.which("xclip") is not None
@@ -64,10 +64,10 @@ def copy_file_contents_to_clipboard(file_paths, include_header=False):
                     copied_all_files = False
 
             if include_header:
-                header = f"=== File: {file_path} ===\\n"
+                header = f"=== File: {file_path} ===\n"
                 file_contents = header + file_contents
 
-            all_file_contents += file_contents + "\\n\\n"
+            all_file_contents += file_contents + "\n\n"
 
         pyperclip.copy(all_file_contents)
         return copied_all_files
