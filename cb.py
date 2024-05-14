@@ -14,6 +14,33 @@ __VERSION__ = "v1.0-4-ged68b6e"
 def is_xclip_installed():
     return shutil.which("xclip") is not None
 
+def is_xsel_installed():
+    return shutil.which("xsel") is not None
+
+def is_pyperclip_installed():
+    try:
+        import pyperclip
+        return True
+    except ImportError:
+        return False
+
+def check_dependencies():
+    missing_dependencies = []
+    
+    if not is_xclip_installed() and not is_xsel_installed():
+        missing_dependencies.append("xclip or xsel")
+    
+    if not is_pyperclip_installed():
+        missing_dependencies.append("pyperclip")
+    
+    return missing_dependencies
+
+def install_dependencies():
+    print("Please install the following dependencies:")
+    dependencies = check_dependencies()
+    for dep in dependencies:
+        print(f"- {dep}")
+
 def copy_image_to_clipboard(image_path):
     if not is_xclip_installed():
         print("Error: xclip is not installed. Please install it using 'sudo apt-get install xclip'.")
@@ -43,8 +70,7 @@ def copy_image_to_clipboard(image_path):
         print(f"Error: An unexpected error occurred while copying the image. {str(e)}")
         return False
 
-
-def copy_file_contents_to_clipboard(file_paths, include_header=False):
+def copy_file_contents_to_clipboard(file_paths, include_header=False, discord_attachment=False):
     try:
         copied_all_files = True
         all_file_contents = ""
@@ -67,6 +93,9 @@ def copy_file_contents_to_clipboard(file_paths, include_header=False):
                 header = f"=== File: {file_path} ===\n"
                 file_contents = header + file_contents
 
+            if discord_attachment:
+                file_contents = f"[Attached file: {file_path}\nContent:\n```\n{file_contents}\n```\n]"
+
             all_file_contents += file_contents + "\n\n"
 
         pyperclip.copy(all_file_contents)
@@ -80,8 +109,18 @@ def main():
     parser = argparse.ArgumentParser(description="Copy file contents or images to clipboard.")
     parser.add_argument("--version", action="store_true", help="Display the application version.")
     parser.add_argument("--header", action="store_true", help="Include header for text files.")
-    parser.add_argument("file_paths", metavar='N', nargs='*', help="Paths of the files or images to copy.")  # Changed nargs='*'
+    parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment.")
+    parser.add_argument("file_paths", metavar='N', nargs='*', help="Paths of the files or images to copy.")
     args = parser.parse_args()
+
+    # Check dependencies before proceeding
+    missing_dependencies = check_dependencies()
+    if missing_dependencies:
+        print("Missing dependencies:")
+        for dep in missing_dependencies:
+            print(f"- {dep}")
+        install_dependencies()
+        return
 
     if args.version:
         print(f"This is the CopyBuffer application, version {__VERSION__}")
@@ -94,11 +133,10 @@ def main():
         if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
             copy_successful = copy_image_to_clipboard(file_path)
         else:
-            copy_successful = copy_file_contents_to_clipboard(args.file_paths, args.header)
+            copy_successful = copy_file_contents_to_clipboard(args.file_paths, args.header, args.attachment)
 
         if copy_successful:
             print(f"{file_path} copied to the clipboard successfully!")
 
 if __name__ == '__main__':
     main()
-
