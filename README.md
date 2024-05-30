@@ -66,6 +66,7 @@ To copy an image to the clipboard, use the same command as for text files, provi
 
 python cb.py <image_path>
 Supported image formats: PNG, JPEG, BMP, GIF (first frame only for animated GIFs)
+
 The image will be copied to the system clipboard, ready to be pasted into other applications.
 
 Example
@@ -73,11 +74,11 @@ python cb.py image.png
 Copying from Standard Input
 You can also copy data from standard input by using - as the file path:
 
-echo "Some text" | python cb.py
+echo "Some text" | python cb.py -
 This can be useful for piping output from other commands into the clipboard.
 
 Example
-cat somefile.txt | python cb.py
+cat somefile.txt | python cb.py -
 Checking the Version
 You can check the version of the script by using the --version flag:
 
@@ -100,7 +101,7 @@ Copying Images for Quick Sharing: Copy images to the clipboard for quick pasting
 python cb.py images/logo.png
 Using Standard Input: Copy text piped from another command.
 
-cat notes.txt | python cb.py
+cat notes.txt | python cb.py -
 Development and Contributions
 Feel free to fork this repository and submit pull requests for any features or bug fixes you would like to see included.
 
