@@ -135,6 +135,7 @@ def main():
             print("STDIN copied to the clipboard successfully!")
     else:
         for file_path in args.file_paths:
+            print(f"Processing file: {file_path}")  # Debug print
             if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
                 copy_successful = copy_image_to_clipboard(file_path)
             else:
