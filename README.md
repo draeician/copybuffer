@@ -61,49 +61,129 @@ Clipboard Manager is a versatile Python script that allows you to quickly and ea
 #### Example
 ```bash
 python cb.py --header -a file1.txt file2.txt
-Copying Images
+```
+
+### Copying Images
 To copy an image to the clipboard, use the same command as for text files, providing the image path:
 
+```bash
 python cb.py <image_path>
+```
+
 Supported image formats: PNG, JPEG, BMP, GIF (first frame only for animated GIFs)
 
 The image will be copied to the system clipboard, ready to be pasted into other applications.
 
-Example
+#### Example
+```bash
 python cb.py image.png
-Copying from Standard Input
-You can also copy data from standard input by using - as the file path:
+```
 
+### Copying from Standard Input
+You can also copy data from standard input by using `-` as the file path:
+
+```bash
 echo "Some text" | python cb.py -
+```
+
 This can be useful for piping output from other commands into the clipboard.
 
-Example
+#### Example
+```bash
 cat somefile.txt | python cb.py -
-Checking the Version
-You can check the version of the script by using the --version flag:
+```
 
+### Checking the Version
+You can check the version of the script by using the `--version` flag:
+
+```bash
 python cb.py --version
-Error Handling
+```
+
+## Error Handling
 The script will print meaningful error messages if something goes wrong, such as if a file is not found or a dependency is missing. Make sure all dependencies are installed properly before running the script.
 
-Example Use Cases
-Copying Text Files for Documentation: Quickly copy the contents of multiple documentation files with headers for easy pasting into reports or wikis.
+## Debugging Steps
+If the script is not working as expected, follow these steps to troubleshoot the issue:
 
+1. **Verify Clipboard Access**:
+   Ensure `xclip` or `xsel` is working correctly by manually testing clipboard access:
+   ```sh
+   echo "test" | xclip -selection clipboard
+   xclip -selection clipboard -o
+   ```
+
+2. **Check Python Environment**:
+   Ensure the required Python packages are installed and versions match:
+   ```sh
+   pip freeze | egrep -i 'pyperclip|pillow|tiktoken'
+   ```
+
+3. **Verify X Server/Display Access**:
+   Ensure the X server is running and accessible:
+   ```sh
+   echo $DISPLAY
+   ```
+
+4. **Check System Logs**:
+   Look for any relevant errors or warnings in the system logs:
+   ```sh
+   tail -f /var/log/syslog
+   ```
+
+5. **Ensure Script Permissions**:
+   Verify the script has execution permissions:
+   ```sh
+   chmod +x cb.py
+   ./cb.py cb.py
+   ```
+
+6. **Reinstall Dependencies**:
+   Reinstall the required packages to ensure there are no issues:
+   ```sh
+   sudo apt-get install --reinstall xclip xsel
+   pip install --force-reinstall pyperclip Pillow tiktoken
+   ```
+
+## Example Use Cases
+
+### Copying Text Files for Documentation
+Quickly copy the contents of multiple documentation files with headers for easy pasting into reports or wikis.
+
+```bash
 python cb.py --header docs/intro.txt docs/setup.txt docs/usage.txt
-Preparing Code Snippets for Discord: Format code snippets as Discord attachments for sharing in developer channels.
+```
 
+### Preparing Code Snippets for Discord
+Format code snippets as Discord attachments for sharing in developer channels.
+
+```bash
 python cb.py --attachment code/example.py
-Counting Tokens in a File: Use the token count feature to analyze the length of text in a file.
+```
 
+### Counting Tokens in a File
+Use the token count feature to analyze the length of text in a file.
+
+```bash
 python cb.py --token path/to/longtextfile.txt
-Copying Images for Quick Sharing: Copy images to the clipboard for quick pasting into documents or image editors.
+```
 
+### Copying Images for Quick Sharing
+Copy images to the clipboard for quick pasting into documents or image editors.
+
+```bash
 python cb.py images/logo.png
-Using Standard Input: Copy text piped from another command.
+```
 
+### Using Standard Input
+Copy text piped from another command.
+
+```bash
 cat notes.txt | python cb.py -
-Development and Contributions
+```
+
+## Development and Contributions
 Feel free to fork this repository and submit pull requests for any features or bug fixes you would like to see included.
 
-License
+## License
 This project is licensed under the MIT License. See the LICENSE file for details.
