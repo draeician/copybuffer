@@ -42,50 +42,6 @@ def install_dependencies():
     for dep in dependencies:
         print(f"- {dep}")
 
-def copy_image_to_clipboard(image_path):
-    if not is_xclip_installed():
-        print("Error: xclip is not installed. Please install it using 'sudo apt-get install xclip'.")
-        return False
-
-    try:
-        # Open the image
-        image = Image.open(image_path)
-
-        # If it's a GIF, take the first frame and convert to RGB
-        if image_path.lower().endswith('.gif'):
-            image = image.convert('RGB')
-
-        # Create a temporary file to hold the image
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-        temp_path = temp_file.name
-
-        # Save the image to the temporary file
-        image.save(temp_path)
-
-        # Use xclip to copy the image to the clipboard
-        command = f"xclip -selection clipboard -t image/png -i {temp_path}"
-        subprocess.run(command, shell=True)
-
-        return True
-    except Exception as e:
-        print(f"Error: An unexpected error occurred while copying the image. {str(e)}")
-        return False
-
-def count_tokens(file_content, encoding_name):
-    """
-    Count the number of tokens in the given file content using the specified encoding.
-
-    Parameters:
-    file_content (str): The contents of the file.
-    encoding_name (str): The name of the encoding to be used.
-
-    Returns:
-    int: The number of tokens.
-    """
-    encoding = tiktoken.get_encoding(encoding_name)
-    tokens = encoding.encode(file_content)
-    return len(tokens)
-
 def copy_file_contents_to_clipboard(file_contents_list, include_header=False, discord_attachment=False, file_paths=None, debug=False):
     try:
         combined_contents = ""
@@ -135,7 +91,13 @@ def main():
 
     encoding = "cl100k_base"
 
-    if not args.file_paths or '-' in args.file_paths:
+    if not args.file_paths and '-' not in args.file_paths:
+        if args.export:
+            clipboard_content = pyperclip.paste()
+            print("Exported contents:\n" + clipboard_content)
+        return
+
+    if '-' in args.file_paths:
         file_content = sys.stdin.read().strip()
         if args.token:
             token_count = count_tokens(file_content, encoding)
