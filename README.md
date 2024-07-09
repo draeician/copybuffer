@@ -1,3 +1,4 @@
+
 # Clipboard Manager (cb.py)
 
 ## Description
@@ -10,6 +11,7 @@ Clipboard Manager is a versatile Python script that allows you to quickly and ea
 - **Include Headers**: Add headers to the copied text indicating the file path.
 - **Discord Attachment Formatting**: Format the copied text as a Discord attachment for easy sharing.
 - **Token Count Display**: Display the token count of the text using Tiktoken.
+- **Export Clipboard Contents**: Export the final clipboard contents to the screen.
 
 ## Requirements
 
@@ -49,18 +51,19 @@ Clipboard Manager is a versatile Python script that allows you to quickly and ea
 3. To copy the contents of one or more files to the clipboard, use the following command:
 
     ```bash
-    python cb.py [--header] [-a|--attachment] <file_path(s)>
+    python cb.py [--header] [-a|--attachment] [-e|--export] <file_path(s)>
     ```
 
     - `<file_path(s)>`: Provide one or more file paths separated by spaces.
     - `--header`: (Optional) Include a header with the filename before each file's contents.
     - `-a` or `--attachment`: (Optional) Format the output as a Discord attachment.
+    - `-e` or `--export`: (Optional) Export the final clipboard contents to the screen.
 
-4. The contents of the specified file(s) will be copied to the system clipboard. If multiple file paths are provided, the script will copy the contents of each file in sequence.
+4. The contents of the specified file(s) will be copied to the system clipboard. If multiple file paths are provided, the script will concatenate and copy the contents of each file in sequence.
 
 #### Example
 ```bash
-python cb.py --header -a file1.txt file2.txt
+python cb.py --header -a -e file1.txt file2.txt
 ```
 
 ### Copying Images
@@ -91,6 +94,20 @@ This can be useful for piping output from other commands into the clipboard.
 #### Example
 ```bash
 cat somefile.txt | python cb.py -
+```
+
+### Exporting Clipboard Contents
+To export the current contents of the clipboard to the screen without copying new content:
+
+```bash
+python cb.py -e
+```
+
+This will print the contents currently in the clipboard.
+
+#### Example
+```bash
+python cb.py -e
 ```
 
 ### Checking the Version
