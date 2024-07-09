@@ -86,16 +86,24 @@ def count_tokens(file_content, encoding_name):
     tokens = encoding.encode(file_content)
     return len(tokens)
 
-def copy_file_contents_to_clipboard(file_contents, include_header=False, discord_attachment=False, file_path=None):
+def copy_file_contents_to_clipboard(file_contents_list, include_header=False, discord_attachment=False, file_paths=None, debug=False):
     try:
-        if include_header and file_path:
-            header = f"=== File: {file_path} ===\n"
-            file_contents = header + file_contents
+        combined_contents = ""
+        for i, file_contents in enumerate(file_contents_list):
+            if include_header and file_paths:
+                header = f"=== File: {file_paths[i]} ===\n"
+                file_contents = header + file_contents
 
-        if discord_attachment and file_path:
-            file_contents = f"[Attached file: {file_path}\nContent:\n```\n{file_contents}\n```\n]"
+            if discord_attachment and file_paths:
+                file_contents = f"[Attached file: {file_paths[i]}\nContent:\n```\n{file_contents}\n```\n]"
 
-        pyperclip.copy(file_contents)
+            combined_contents += file_contents + "\n"
+            if debug:
+                print(f"Debug: Combined contents so far:\n{combined_contents}")  # Debug print
+
+        pyperclip.copy(combined_contents)
+        if debug:
+            print(f"Debug: Final combined contents copied to clipboard:\n{combined_contents}")  # Debug print
         return True
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
@@ -107,6 +115,7 @@ def main():
     parser.add_argument("--header", action="store_true", help="Include header for text files.")
     parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment.")
     parser.add_argument("-t", "--token", action="store_true", help="Display token count using Tiktoken")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("file_paths", metavar='N', nargs='*', help="Paths of the files or images to copy.")
     args = parser.parse_args()
 
@@ -130,28 +139,40 @@ def main():
         if args.token:
             token_count = count_tokens(file_content, encoding)
             print(f'STDIN contains {token_count} tokens.')
-        copy_successful = copy_file_contents_to_clipboard(file_content, args.header, args.attachment)
+        copy_successful = copy_file_contents_to_clipboard([file_content], args.header, args.attachment, debug=args.debug)
         if copy_successful:
             print("STDIN copied to the clipboard successfully!")
     else:
+        file_contents_list = []
+        valid_file_paths = []
         for file_path in args.file_paths:
-            print(f"Processing file: {file_path}")  # Debug print
+            if args.debug:
+                print(f"Processing file: {file_path}")  # Debug print
             if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
                 copy_successful = copy_image_to_clipboard(file_path)
+                if not copy_successful:
+                    return
             else:
                 try:
                     with open(file_path, 'r') as file:
                         file_content = file.read().strip()
-                        if args.token:
-                            token_count = count_tokens(file_content, encoding)
-                            print(f'{file_path} contains {token_count} tokens.')
-                        copy_successful = copy_file_contents_to_clipboard(file_content, args.header, args.attachment, file_path)
+                        file_contents_list.append(file_content)
+                        valid_file_paths.append(file_path)
+                        if args.debug:
+                            print(f"Debug: Appended contents of {file_path}")  # Debug print
                 except FileNotFoundError:
                     print(f"Error: File '{file_path}' not found.")
                     continue
 
+        if args.token:
+            for file_content, file_path in zip(file_contents_list, valid_file_paths):
+                token_count = count_tokens(file_content, encoding)
+                print(f'{file_path} contains {token_count} tokens.')
+
+        if file_contents_list:
+            copy_successful = copy_file_contents_to_clipboard(file_contents_list, args.header, args.attachment, valid_file_paths, debug=args.debug)
             if copy_successful:
-                print(f"{file_path} copied to the clipboard successfully!")
+                print(f"All files copied to the clipboard successfully!")
 
 if __name__ == '__main__':
     main()
