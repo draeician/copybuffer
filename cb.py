@@ -104,10 +104,10 @@ def copy_file_contents_to_clipboard(file_contents_list, include_header=False, di
         pyperclip.copy(combined_contents)
         if debug:
             print(f"Debug: Final combined contents copied to clipboard:\n{combined_contents}")  # Debug print
-        return True
+        return combined_contents
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
-        return False
+        return None
 
 def main():
     parser = argparse.ArgumentParser(description="Copy file contents or images to clipboard.")
@@ -116,6 +116,7 @@ def main():
     parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment.")
     parser.add_argument("-t", "--token", action="store_true", help="Display token count using Tiktoken")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--export", "-e", action="store_true", help="Export final contents to the screen")
     parser.add_argument("file_paths", metavar='N', nargs='*', help="Paths of the files or images to copy.")
     args = parser.parse_args()
 
@@ -139,9 +140,11 @@ def main():
         if args.token:
             token_count = count_tokens(file_content, encoding)
             print(f'STDIN contains {token_count} tokens.')
-        copy_successful = copy_file_contents_to_clipboard([file_content], args.header, args.attachment, debug=args.debug)
-        if copy_successful:
+        combined_contents = copy_file_contents_to_clipboard([file_content], args.header, args.attachment, debug=args.debug)
+        if combined_contents:
             print("STDIN copied to the clipboard successfully!")
+            if args.export:
+                print("Exported contents:\n" + combined_contents)
     else:
         file_contents_list = []
         valid_file_paths = []
@@ -170,9 +173,11 @@ def main():
                 print(f'{file_path} contains {token_count} tokens.')
 
         if file_contents_list:
-            copy_successful = copy_file_contents_to_clipboard(file_contents_list, args.header, args.attachment, valid_file_paths, debug=args.debug)
-            if copy_successful:
+            combined_contents = copy_file_contents_to_clipboard(file_contents_list, args.header, args.attachment, valid_file_paths, debug=args.debug)
+            if combined_contents:
                 print(f"All files copied to the clipboard successfully!")
+                if args.export:
+                    print("Exported contents:\n" + combined_contents)
 
 if __name__ == '__main__':
     main()
