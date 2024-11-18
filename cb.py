@@ -10,7 +10,7 @@ import subprocess
 import shutil
 import tiktoken
 
-__VERSION__ = "v1.0-4-ged68b6e"
+__VERSION__ = "v1.5"
 
 def is_xclip_installed():
     return shutil.which("xclip") is not None

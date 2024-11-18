@@ -87,6 +87,13 @@ Enable detailed output for troubleshooting:
 python cb.py --debug filename.txt
 ```
 
+### Version Information
+```bash
+# Display version information
+python cb.py --version
+# Output: cb.py version v1.5
+```
+
 ## Error Handling
 The script provides clear error messages for common issues:
 - Missing dependencies
