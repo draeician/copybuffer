@@ -65,15 +65,36 @@ def copy_file_contents_to_clipboard(file_contents_list, include_header=False, di
         print(f"Error: An unexpected error occurred. {str(e)}")
         return None
 
+def copy_to_clipboard():
+    # Check if input is from STDIN or file
+    if len(sys.argv) == 1:
+        # Read from STDIN
+        try:
+            content = sys.stdin.read()
+            pyperclip.copy(content)
+        except Exception as e:
+            print(f"Error copying from STDIN: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Existing file reading logic
+        try:
+            with open(sys.argv[1], 'r') as file:
+                content = file.read()
+                pyperclip.copy(content)
+        except FileNotFoundError:
+            print(f"Error: File '{sys.argv[1]}' not found", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
 def main():
-    parser = argparse.ArgumentParser(description="Copy file contents or images to clipboard.")
+    parser = argparse.ArgumentParser(description="Copy file contents, images, or STDIN input to clipboard.")
     parser.add_argument("--version", action="store_true", help="Display the application version.")
-    parser.add_argument("--header", action="store_true", help="Include header for text files.")
-    parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment.")
-    parser.add_argument("-t", "--token", action="store_true", help="Display token count using Tiktoken")
-    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("--export", "-e", action="store_true", help="Export final contents to the screen")
-    parser.add_argument("file_paths", metavar='N', nargs='*', help="Paths of the files or images to copy.")
+    parser.add_argument("file", nargs="?", help="File to copy (optional - reads from STDIN if not provided)")
+    parser.add_argument("-i", "--include-header", action="store_true", help="Include the filename as a header in copied text")
+    parser.add_argument("-d", "--directory", action="store_true", help="Copy contents of all files in directory")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Display the copied contents")
     args = parser.parse_args()
 
     # Check dependencies before proceeding
@@ -142,5 +163,5 @@ def main():
                     print("Exported contents:\n" + combined_contents)
 
 if __name__ == '__main__':
-    main()
+    copy_to_clipboard()
 
