@@ -91,10 +91,12 @@ def copy_to_clipboard():
 def main():
     parser = argparse.ArgumentParser(description="Copy file contents, images, or STDIN input to clipboard.")
     parser.add_argument("--version", action="store_true", help="Display the application version.")
-    parser.add_argument("file", nargs="?", help="File to copy (optional - reads from STDIN if not provided)")
+    parser.add_argument("files", nargs="*", help="Files to copy (reads from STDIN if not provided)")
     parser.add_argument("-i", "--include-header", action="store_true", help="Include the filename as a header in copied text")
     parser.add_argument("-d", "--directory", action="store_true", help="Copy contents of all files in directory")
     parser.add_argument("-v", "--verbose", action="store_true", help="Display the copied contents")
+    parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
     # Check dependencies before proceeding
@@ -110,58 +112,52 @@ def main():
         print(f"This is the CopyBuffer application, version {__VERSION__}")
         return
 
-    encoding = "cl100k_base"
-
-    if not args.file_paths and '-' not in args.file_paths:
-        if args.export:
-            clipboard_content = pyperclip.paste()
-            print("Exported contents:\n" + clipboard_content)
-        return
-
-    if '-' in args.file_paths:
-        file_content = sys.stdin.read().strip()
-        if args.token:
-            token_count = count_tokens(file_content, encoding)
-            print(f'STDIN contains {token_count} tokens.')
-        combined_contents = copy_file_contents_to_clipboard([file_content], args.header, args.attachment, debug=args.debug)
+    # If no files provided, check STDIN
+    if not args.files:
+        content = sys.stdin.read().strip()
+        if args.debug:
+            print(f"Debug: Read from STDIN: {content}")
+        combined_contents = copy_file_contents_to_clipboard([content], args.include_header, args.attachment, debug=args.debug)
         if combined_contents:
             print("STDIN copied to the clipboard successfully!")
-            if args.export:
-                print("Exported contents:\n" + combined_contents)
-    else:
-        file_contents_list = []
-        valid_file_paths = []
-        for file_path in args.file_paths:
-            if args.debug:
-                print(f"Processing file: {file_path}")  # Debug print
-            if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
-                copy_successful = copy_image_to_clipboard(file_path)
-                if not copy_successful:
-                    return
-            else:
-                try:
-                    with open(file_path, 'r') as file:
-                        file_content = file.read().strip()
-                        file_contents_list.append(file_content)
-                        valid_file_paths.append(file_path)
-                        if args.debug:
-                            print(f"Debug: Appended contents of {file_path}")  # Debug print
-                except FileNotFoundError:
-                    print(f"Error: File '{file_path}' not found.")
-                    continue
+            if args.verbose:
+                print("Copied contents:\n" + combined_contents)
+        return
 
-        if args.token:
-            for file_content, file_path in zip(file_contents_list, valid_file_paths):
-                token_count = count_tokens(file_content, encoding)
-                print(f'{file_path} contains {token_count} tokens.')
+    # Process files
+    file_contents_list = []
+    valid_file_paths = []
+    for file_path in args.files:
+        try:
+            with open(file_path, 'r') as file:
+                file_content = file.read().strip()
+                file_contents_list.append(file_content)
+                valid_file_paths.append(file_path)
+                if args.debug:
+                    print(f"Debug: Read file {file_path}")
+        except FileNotFoundError:
+            print(f"Error: File '{file_path}' not found")
+            continue
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
+            continue
 
-        if file_contents_list:
-            combined_contents = copy_file_contents_to_clipboard(file_contents_list, args.header, args.attachment, valid_file_paths, debug=args.debug)
-            if combined_contents:
-                print(f"All files copied to the clipboard successfully!")
-                if args.export:
-                    print("Exported contents:\n" + combined_contents)
+    if file_contents_list:
+        combined_contents = copy_file_contents_to_clipboard(
+            file_contents_list, 
+            args.include_header, 
+            args.attachment, 
+            valid_file_paths,
+            args.debug
+        )
+        if combined_contents:
+            print("Files copied to clipboard successfully!")
+            if args.verbose:
+                print("Copied contents:\n" + combined_contents)
+
+# Add back the encoding variable
+encoding = "cl100k_base"
 
 if __name__ == '__main__':
-    copy_to_clipboard()
+    main()  # Use main() instead of copy_to_clipboard()
 
