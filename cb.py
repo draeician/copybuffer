@@ -10,7 +10,7 @@ import subprocess
 import shutil
 import tiktoken
 
-__VERSION__ = "v1.5"
+__VERSION__ = "1.6.1"
 
 def is_xclip_installed():
     return shutil.which("xclip") is not None
@@ -109,7 +109,7 @@ def main():
         return
 
     if args.version:
-        print(f"This is the CopyBuffer application, version {__VERSION__}")
+        print(f"copybuffer version {__VERSION__}")
         return
 
     # If no files provided, check STDIN
