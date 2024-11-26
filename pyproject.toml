@@ -41,8 +41,8 @@ line-length = 88
 target-version = "py39"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+packages = ["copybuffer"]
 
 [project.scripts]
-cb = "cb:main"  # Primary command
-"cb.py" = "cb:main"  # Alias with .py extension
+cb = "copybuffer:main"  # Primary command
+"cb.py" = "copybuffer:main"  # Alias with .py extension
