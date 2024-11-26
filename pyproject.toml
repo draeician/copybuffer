@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "copybuffer"
-version = "1.5"
+version = "1.6.1"
 description = "A command-line utility for copying file contents, directory contents, or STDIN input to the system clipboard."
 authors = [
     { name = "Draeician", email = "draeician@gmail.com" }
@@ -44,4 +44,5 @@ target-version = "py39"
 packages = ["."]
 
 [project.scripts]
-cb = "cb:main"  # Entry point for the command-line utility
+cb = "cb:main"  # Primary command
+"cb.py" = "cb:main"  # Alias with .py extension

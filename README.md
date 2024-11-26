@@ -1,4 +1,4 @@
-# Clipboard Manager (cb.py)
+# Clipboard Manager (cb)
 
 ## Description
 A versatile command-line utility for copying file contents, directory contents, or STDIN input to the system clipboard. Supports both text and image files, with special features for Discord formatting and debug output.
@@ -20,9 +20,13 @@ A versatile command-line utility for copying file contents, directory contents, 
 - xclip or xsel (Linux only)
 
 ## Installation
-1. Install Python dependencies:
+1. Install package with pipx:
 ```bash
-pip install pyperclip pillow
+pipx install .
+```
+## Uninstall
+```bash
+pipx uninstall copybuffer)
 ```
 
 2. For Linux systems, install clipboard handlers:
@@ -37,19 +41,19 @@ sudo apt-get install xsel
 ### Basic Usage
 ```bash
 # Copy file contents
-python cb.py filename.txt
+cb filename.txt
 
 # Copy from STDIN
-echo "hello" | python cb.py
+echo "hello" | cb
 
 # Copy directory contents
-python cb.py -d directory/
+cb -d directory/
 
 # Copy with Discord formatting
-python cb.py -a filename.txt
+cb -a filename.txt
 
 # Copy with headers
-python cb.py -i filename.txt
+cb -i filename.txt
 ```
 
 ### Options
@@ -69,13 +73,13 @@ Supports copying image files directly to clipboard:
 - GIF (first frame)
 
 ```bash
-python cb.py image.png
+cb image.png
 ```
 
 ### Directory Mode
 Copy contents of all text files in a directory:
 ```bash
-python cb.py -d /path/to/directory
+cb -d /path/to/directory
 ```
 - Automatically skips image files
 - Optionally includes headers with -i flag
@@ -84,13 +88,13 @@ python cb.py -d /path/to/directory
 ### Debug Mode
 Enable detailed output for troubleshooting:
 ```bash
-python cb.py --debug filename.txt
+cb --debug filename.txt
 ```
 
 ### Version Information
 ```bash
 # Display version information
-python cb.py --version
+cb --version
 # Output: cb.py version v1.5
 ```
 
@@ -106,19 +110,19 @@ The script provides clear error messages for common issues:
 
 ### Copy with Headers
 ```bash
-python cb.py -i document.txt
+cb -i document.txt
 # Output includes: === document.txt ===
 ```
 
 ### Discord Formatting
 ```bash
-python cb.py -a code.py
+cb -a code.py
 # Output format: [Attached file: code.py\nContent:\n```\n...\n```\n]
 ```
 
 ### Verbose Directory Copy
 ```bash
-python cb.py -d -v -i /path/to/docs
+cb -d -v -i /path/to/docs
 # Shows all processed files and copied content
 ```
 
