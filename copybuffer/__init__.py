@@ -9,6 +9,8 @@ import tempfile
 import subprocess
 import shutil
 import tiktoken
+import mimetypes
+from pathlib import Path
 
 __VERSION__ = "1.6.1"
 
@@ -88,6 +90,102 @@ def copy_to_clipboard():
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
 
+def get_file_stats(file_path):
+    """Get detailed statistics about a file.
+    
+    Args:
+        file_path (str): Path to the file
+        
+    Returns:
+        dict: Dictionary containing file statistics
+    """
+    path = Path(file_path)
+    stats = path.stat()
+    mime_type, encoding = mimetypes.guess_type(file_path)
+    
+    # Initialize mimetypes if needed
+    if not mimetypes.inited:
+        mimetypes.init()
+    
+    file_stats = {
+        'size': stats.st_size,
+        'size_human': f"{stats.st_size / 1024:.2f} KB" if stats.st_size >= 1024 else f"{stats.st_size} bytes",
+        'mime_type': mime_type or 'application/octet-stream',
+        'is_binary': mime_type and not mime_type.startswith('text/'),
+        'extension': path.suffix,
+        'last_modified': stats.st_mtime,
+        'created': stats.st_ctime,
+    }
+    
+    # Add text statistics if it's a text file
+    if not file_stats['is_binary']:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                lines = content.splitlines()
+                words = content.split()
+                
+                file_stats.update({
+                    'line_count': len(lines),
+                    'word_count': len(words),
+                    'char_count': len(content),
+                    'char_no_spaces': len(content.replace(' ', '').replace('\n', '').replace('\r', '')),
+                    'avg_line_length': len(content) / len(lines) if lines else 0,
+                    'avg_word_length': sum(len(word) for word in words) / len(words) if words else 0,
+                })
+        except Exception as e:
+            file_stats['text_stats_error'] = str(e)
+    
+    return file_stats
+
+def format_file_stats(file_path, stats, token_count=None):
+    """Format file statistics for display.
+    
+    Args:
+        file_path (str): Path to the file
+        stats (dict): File statistics dictionary
+        token_count (int, optional): Number of tokens if text file
+        
+    Returns:
+        str: Formatted statistics string
+    """
+    from datetime import datetime
+    
+    output = [
+        f"\nFile Statistics for: {file_path}",
+        f"{'=' * (18 + len(file_path))}",
+        f"Type: {stats['mime_type']}",
+        f"Size: {stats['size_human']} ({stats['size']} bytes)",
+        f"Extension: {stats['extension'] or 'No extension'}",
+        f"Last Modified: {datetime.fromtimestamp(stats['last_modified']).strftime('%Y-%m-%d %H:%M:%S')}",
+    ]
+    
+    if not stats['is_binary']:
+        if 'text_stats_error' not in stats:
+            output.extend([
+                "\nText Statistics:",
+                f"Lines: {stats['line_count']:,}",
+                f"Words: {stats['word_count']:,}",
+                f"Characters (with spaces): {stats['char_count']:,}",
+                f"Characters (no spaces): {stats['char_no_spaces']:,}",
+                f"Average Line Length: {stats['avg_line_length']:.2f} characters",
+                f"Average Word Length: {stats['avg_word_length']:.2f} characters",
+            ])
+            
+            if token_count is not None:
+                output.extend([
+                    f"\nToken Statistics:",
+                    f"Token Count: {token_count:,}",
+                    f"Avg Bytes per Token: {stats['size'] / token_count:.2f}",
+                    f"Tokens per Word: {token_count / stats['word_count']:.2f}" if stats['word_count'] > 0 else "Tokens per Word: N/A"
+                ])
+        else:
+            output.append(f"\nError reading text statistics: {stats['text_stats_error']}")
+    else:
+        output.append("\nNote: Binary file - text statistics not applicable")
+    
+    return '\n'.join(output)
+
 def main():
     parser = argparse.ArgumentParser(description="Copy file contents, images, or STDIN input to clipboard.")
     parser.add_argument("--version", action="store_true", help="Display the application version.")
@@ -96,6 +194,7 @@ def main():
     parser.add_argument("-d", "--directory", action="store_true", help="Copy contents of all files in directory")
     parser.add_argument("-v", "--verbose", action="store_true", help="Display the copied contents")
     parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment")
+    parser.add_argument("-t", "--tokens", action="store_true", help="Display token statistics for the file")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
@@ -154,6 +253,27 @@ def main():
             print("Files copied to clipboard successfully!")
             if args.verbose:
                 print("Copied contents:\n" + combined_contents)
+
+    if args.tokens:
+        enc = tiktoken.get_encoding(encoding)
+        for file_path in args.files:
+            try:
+                stats = get_file_stats(file_path)
+                token_count = None
+                
+                if not stats['is_binary']:
+                    with open(file_path, 'r') as file:
+                        content = file.read()
+                        tokens = enc.encode(content)
+                        token_count = len(tokens)
+                
+                print(format_file_stats(file_path, stats, token_count))
+                
+            except FileNotFoundError:
+                print(f"Error: File '{file_path}' not found")
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+        return
 
 # Add back the encoding variable
 encoding = "cl100k_base"
