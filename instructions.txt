@@ -5,3 +5,6 @@ I'd rather keep the -a as the discord document type, let's make --append for thi
 
 ---
 The code is good.  It's time to commit, which means first update the version, and put this information production with the verison tag at the end.  Remember to merge the branch and remove it when done to keep the repo clean.  The TODO.md can be removed, it was just a personal note to myself.
+
+---
+Yes.. commit, merge, and push to origin.

@@ -1,0 +1,6 @@
+Project summary:
+- CLI clipboard utility for copying files/STDIN
+- New: -p/--paste and --append (heredoc generation)
+- Preserved -a/--attachment for Discord formatting
+- Version 1.7.0; README and CHANGELOG updated
+- Removed TODO.md; added final_review_gate.py; updated instructions.txt
