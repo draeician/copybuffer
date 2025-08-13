@@ -10,6 +10,8 @@ A versatile command-line utility for copying file contents, directory contents, 
 - Copy images to clipboard
 - Include headers with filenames
 - Format output for Discord
+- Generate heredoc shell script to recreate files on paste
+- Append mode for heredoc script generation
 - Verbose output option
 - Debug mode
 
@@ -54,6 +56,12 @@ cb -a filename.txt
 
 # Copy with headers
 cb -i filename.txt
+
+# Copy as heredoc script for recreating files on paste
+cb -p path/to/file1.txt path/to/file2.txt
+
+# Copy as heredoc script that appends to target files
+cb --append path/to/file1.txt
 ```
 
 ### Options
@@ -62,6 +70,8 @@ cb -i filename.txt
 - `-d, --directory`: Copy contents of all files in directory
 - `-v, --verbose`: Display the copied contents
 - `-a, --attachment`: Format output as Discord attachment
+- `-p, --paste`: Copy a heredoc shell script that recreates the given files when pasted
+- `--append`: Use with `--paste` behavior to append to files instead of overwriting
 - `--debug`: Enable debug mode
 - `--version`: Display application version
 
@@ -95,7 +105,7 @@ cb --debug filename.txt
 ```bash
 # Display version information
 cb --version
-# Output: cb.py version v1.5
+# Output: copybuffer version 1.7.0
 ```
 
 ## Error Handling
@@ -118,6 +128,19 @@ cb -i document.txt
 ```bash
 cb -a code.py
 # Output format: [Attached file: code.py\nContent:\n```\n...\n```\n]
+```
+
+### Heredoc Script Generation
+```bash
+# Overwrite or create files on the target system
+cb -p path/to/file1 path/to/nested/dir/file2
+
+# Append to files on the target system
+cb --append path/to/file1
+
+# Notes:
+# - A random, content-safe delimiter is used to avoid collisions
+# - Single-quoted heredocs prevent shell interpolation
 ```
 
 ### Verbose Directory Copy

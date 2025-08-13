@@ -12,7 +12,7 @@ import tiktoken
 import mimetypes
 from pathlib import Path
 
-__VERSION__ = "1.6.1"
+__VERSION__ = "1.7.0"
 
 def is_xclip_installed():
     return shutil.which("xclip") is not None
@@ -66,6 +66,54 @@ def copy_file_contents_to_clipboard(file_contents_list, include_header=False, di
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
         return None
+
+def _choose_unique_heredoc_delimiter(contents: str) -> str:
+    """Choose a heredoc delimiter that does not appear in contents.
+
+    Args:
+        contents: The string content that will be placed inside the heredoc.
+
+    Returns:
+        A delimiter string safe to use as a heredoc terminator.
+    """
+    import secrets
+
+    base = "EOF_CB_"
+    for _ in range(10):
+        candidate = base + secrets.token_hex(4).upper()
+        if candidate not in contents:
+            return candidate
+    return base + secrets.token_hex(16).upper()
+
+def _shell_single_quote(value: str) -> str:
+    """Safely single-quote a string for POSIX shell.
+
+    Replaces single quotes using the standard pattern: ' -> '\''
+    """
+    return "'" + value.replace("'", "'\\''") + "'"
+
+def generate_heredoc_script(file_paths, file_contents_list, append: bool = False) -> str:
+    """Generate a shell script using heredoc to create or append files with their contents.
+
+    Args:
+        file_paths: List of file paths corresponding to the contents provided.
+        file_contents_list: List of file contents as strings.
+        append: If True, appends to files (>>); otherwise overwrites (>)
+
+    Returns:
+        Combined shell script text for recreating the files on a target system.
+    """
+    lines = ["#!/usr/bin/env bash"]
+    redir = ">>" if append else ">"
+    for path, contents in zip(file_paths, file_contents_list):
+        delimiter = _choose_unique_heredoc_delimiter(contents)
+        quoted_path = _shell_single_quote(path)
+        lines.append(f"mkdir -p \"$(dirname -- {quoted_path})\"")
+        lines.append(f"cat {redir} {quoted_path} << '{delimiter}'")
+        lines.append(contents)
+        lines.append(delimiter)
+        lines.append("")
+    return "\n".join(lines)
 
 def copy_to_clipboard():
     # Check if input is from STDIN or file
@@ -194,6 +242,8 @@ def main():
     parser.add_argument("-d", "--directory", action="store_true", help="Copy contents of all files in directory")
     parser.add_argument("-v", "--verbose", action="store_true", help="Display the copied contents")
     parser.add_argument("-a", "--attachment", action="store_true", help="Format output as Discord attachment")
+    parser.add_argument("-p", "--paste", action="store_true", help="Format output as a shell heredoc script to create files on paste")
+    parser.add_argument("--append", action="store_true", help="Like --paste, but append to the target files instead of overwriting")
     parser.add_argument("-t", "--tokens", action="store_true", help="Display token statistics for the file")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
@@ -213,6 +263,9 @@ def main():
 
     # If no files provided, check STDIN
     if not args.files:
+        if args.paste or args.append:
+            print("Error: --paste/--append require file paths to determine output destinations.")
+            return
         content = sys.stdin.read().strip()
         if args.debug:
             print(f"Debug: Read from STDIN: {content}")
@@ -242,17 +295,27 @@ def main():
             continue
 
     if file_contents_list:
-        combined_contents = copy_file_contents_to_clipboard(
-            file_contents_list, 
-            args.include_header, 
-            args.attachment, 
-            valid_file_paths,
-            args.debug
-        )
-        if combined_contents:
-            print("Files copied to clipboard successfully!")
-            if args.verbose:
-                print("Copied contents:\n" + combined_contents)
+        if args.paste or args.append:
+            script_text = generate_heredoc_script(valid_file_paths, file_contents_list, append=args.append)
+            try:
+                pyperclip.copy(script_text)
+                if args.verbose:
+                    print("Copied heredoc script:\n" + script_text)
+                print("Heredoc script copied to clipboard successfully!")
+            except Exception as e:
+                print(f"Error: An unexpected error occurred. {str(e)}")
+        else:
+            combined_contents = copy_file_contents_to_clipboard(
+                file_contents_list, 
+                args.include_header, 
+                args.attachment, 
+                valid_file_paths,
+                args.debug
+            )
+            if combined_contents:
+                print("Files copied to clipboard successfully!")
+                if args.verbose:
+                    print("Copied contents:\n" + combined_contents)
 
     if args.tokens:
         enc = tiktoken.get_encoding(encoding)

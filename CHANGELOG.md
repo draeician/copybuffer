@@ -23,6 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error messages for missing dependencies
 - Clipboard handling on different platforms
 
+## [1.7.0] - 2025-08-13
+### Added
+- New `-p/--paste` flag to copy a shell heredoc script that recreates the given files on paste
+- New `--append` flag to generate heredoc that appends to target files instead of overwriting
+- Keeps existing `-a/--attachment` for Discord formatting (unchanged)
+
+### Changed
+- Bumped version to 1.7.0
+
+### Notes
+- Heredoc uses a random, content-safe delimiter and single-quoted terminator to avoid interpolation
+
 ## [1.0.4] - 2024-03-01
 ### Added
 - Initial release
