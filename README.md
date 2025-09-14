@@ -20,6 +20,7 @@ A versatile command-line utility for copying file contents, directory contents, 
 - pyperclip
 - PIL (for image support)
 - xclip or xsel (Linux only)
+- wl-clipboard (Wayland only)
 
 ## Installation
 1. Install package with pipx:
@@ -36,6 +37,8 @@ pipx uninstall copybuffer)
 sudo apt-get install xclip
 # or
 sudo apt-get install xsel
+# For Wayland sessions
+sudo apt-get install wl-clipboard
 ```
 
 ## Usage
@@ -105,7 +108,7 @@ cb --debug filename.txt
 ```bash
 # Display version information
 cb --version
-# Output: copybuffer version 1.7.0
+# Output: copybuffer version 1.8.0
 ```
 
 ## Error Handling
