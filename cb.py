@@ -12,9 +12,12 @@ __VERSION__ = "1.8.0"
 
 
 def is_wayland() -> bool:
+    """Return True if running in a Wayland session."""
     return bool(
         os.environ.get("WAYLAND_DISPLAY")
         or os.environ.get("XDG_SESSION_TYPE") == "wayland"
+        or os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+        or os.environ.get("SWAYSOCK")
     )
 
 

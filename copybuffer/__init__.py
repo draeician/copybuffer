@@ -19,6 +19,8 @@ def is_wayland() -> bool:
     return bool(
         os.environ.get("WAYLAND_DISPLAY")
         or os.environ.get("XDG_SESSION_TYPE") == "wayland"
+        or os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+        or os.environ.get("SWAYSOCK")
     )
 
 
