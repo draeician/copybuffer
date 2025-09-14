@@ -19,7 +19,7 @@ A versatile command-line utility for copying file contents, directory contents, 
 - Python 3.x
 - pyperclip
 - PIL (for image support)
-- xclip or xsel (Linux only)
+- xclip or xsel (Linux only, requires an X11 DISPLAY)
 - wl-clipboard (Wayland only)
 
   On CachyOS/Hyprland systems, `wl-clipboard` is required. Wayland detection
