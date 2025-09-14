@@ -46,6 +46,7 @@ def test_check_dependencies_xclip_missing(monkeypatch):
     monkeypatch.setattr(copybuffer, "is_wayland", lambda: False)
     monkeypatch.setattr(copybuffer, "is_xclip_installed", lambda: False)
     monkeypatch.setattr(copybuffer, "is_xsel_installed", lambda: False)
+    monkeypatch.setenv("DISPLAY", ":1")
     deps = copybuffer.check_dependencies()
     assert deps == ["xclip or xsel"]
 
@@ -55,8 +56,18 @@ def test_check_dependencies_missing_pyperclip(monkeypatch):
     monkeypatch.setattr(copybuffer, "is_xclip_installed", lambda: True)
     monkeypatch.setattr(copybuffer, "is_xsel_installed", lambda: True)
     monkeypatch.setattr(copybuffer, "is_pyperclip_installed", lambda: False)
+    monkeypatch.setenv("DISPLAY", ":1")
     deps = copybuffer.check_dependencies()
     assert deps == ["pyperclip"]
+
+
+def test_check_dependencies_missing_display(monkeypatch):
+    monkeypatch.setattr(copybuffer, "is_wayland", lambda: False)
+    monkeypatch.setattr(copybuffer, "is_xclip_installed", lambda: True)
+    monkeypatch.setattr(copybuffer, "is_xsel_installed", lambda: True)
+    monkeypatch.delenv("DISPLAY", raising=False)
+    deps = copybuffer.check_dependencies()
+    assert "DISPLAY environment variable" in deps
 
 
 def test_copy_file_contents_success(monkeypatch):
@@ -86,6 +97,17 @@ def test_copy_file_contents_wayland_error(monkeypatch, capsys):
     monkeypatch.setattr(copybuffer, "is_wayland", lambda: True)
     copybuffer.copy_file_contents_to_clipboard(["data"])
     assert "wl-clipboard" in capsys.readouterr().out
+
+
+def test_copy_file_contents_no_display(monkeypatch, capsys):
+    def raising_copy(_):
+        raise pyperclip.PyperclipException()
+
+    monkeypatch.setattr(pyperclip, "copy", raising_copy)
+    monkeypatch.setattr(copybuffer, "is_wayland", lambda: False)
+    monkeypatch.delenv("DISPLAY", raising=False)
+    copybuffer.copy_file_contents_to_clipboard(["data"])
+    assert "DISPLAY" in capsys.readouterr().out
 
 
 def test_is_xclip_and_xsel_installed(monkeypatch):

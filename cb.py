@@ -30,6 +30,10 @@ def is_xclip_installed():
 def is_xsel_installed():
     return shutil.which("xsel") is not None
 
+def has_display() -> bool:
+    """Return True if an X11 display is available."""
+    return bool(os.environ.get("DISPLAY"))
+
 def is_pyperclip_installed():  # pragma: no cover
     return importlib.util.find_spec("pyperclip") is not None
 
@@ -39,6 +43,8 @@ def check_dependencies():
     if is_wayland():
         if not is_wlclipboard_installed():
             missing_dependencies.append("wl-clipboard (wl-copy and wl-paste)")
+    elif not has_display():
+        missing_dependencies.append("DISPLAY environment variable")
     elif not is_xclip_installed() and not is_xsel_installed():
         missing_dependencies.append("xclip or xsel")
 
@@ -83,6 +89,10 @@ def copy_file_contents_to_clipboard(
     except pyperclip.PyperclipException:
         if is_wayland():
             print("Error: Install 'wl-clipboard' for Wayland clipboard support.")
+        elif not has_display():
+            print(
+                "Error: No DISPLAY environment variable. Ensure an X server is running or install wl-clipboard for Wayland."
+            )
         else:
             print("Error: No clipboard mechanism found. Install xclip or xsel.")
         return None
