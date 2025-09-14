@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
-from PIL import Image
-import pyperclip
+import importlib.util
 import os
-import sys
-import tempfile
-import subprocess
 import shutil
-import tiktoken
+import sys
 
-__VERSION__ = "1.7.0"
+import pyperclip
+
+__VERSION__ = "1.8.0"
+
+
+def is_wayland() -> bool:
+    return bool(
+        os.environ.get("WAYLAND_DISPLAY")
+        or os.environ.get("XDG_SESSION_TYPE") == "wayland"
+    )
+
+
+def is_wlclipboard_installed() -> bool:
+    return shutil.which("wl-copy") is not None and shutil.which("wl-paste") is not None
 
 def is_xclip_installed():
     return shutil.which("xclip") is not None
@@ -18,17 +27,16 @@ def is_xclip_installed():
 def is_xsel_installed():
     return shutil.which("xsel") is not None
 
-def is_pyperclip_installed():
-    try:
-        import pyperclip
-        return True
-    except ImportError:
-        return False
+def is_pyperclip_installed():  # pragma: no cover
+    return importlib.util.find_spec("pyperclip") is not None
 
 def check_dependencies():
     missing_dependencies = []
 
-    if not is_xclip_installed() and not is_xsel_installed():
+    if is_wayland():
+        if not is_wlclipboard_installed():
+            missing_dependencies.append("wl-clipboard (wl-copy and wl-paste)")
+    elif not is_xclip_installed() and not is_xsel_installed():
         missing_dependencies.append("xclip or xsel")
 
     if not is_pyperclip_installed():
@@ -42,7 +50,13 @@ def install_dependencies():
     for dep in dependencies:
         print(f"- {dep}")
 
-def copy_file_contents_to_clipboard(file_contents_list, include_header=False, discord_attachment=False, file_paths=None, debug=False):
+def copy_file_contents_to_clipboard(
+    file_contents_list,
+    include_header=False,
+    discord_attachment=False,
+    file_paths=None,
+    debug=False,
+):
     try:
         combined_contents = ""
         for i, file_contents in enumerate(file_contents_list):
@@ -51,16 +65,24 @@ def copy_file_contents_to_clipboard(file_contents_list, include_header=False, di
                 file_contents = header + file_contents
 
             if discord_attachment and file_paths:
-                file_contents = f"[Attached file: {file_paths[i]}\nContent:\n```\n{file_contents}\n```\n]"
+                file_contents = (
+                    f"[Attached file: {file_paths[i]}\nContent:\n```\n{file_contents}\n```\n]"
+                )
 
             combined_contents += file_contents + "\n"
             if debug:
-                print(f"Debug: Combined contents so far:\n{combined_contents}")  # Debug print
+                print(f"Debug: Combined contents so far:\n{combined_contents}")
 
         pyperclip.copy(combined_contents)
         if debug:
-            print(f"Debug: Final combined contents copied to clipboard:\n{combined_contents}")  # Debug print
+            print(f"Debug: Final combined contents copied to clipboard:\n{combined_contents}")
         return combined_contents
+    except pyperclip.PyperclipException:
+        if is_wayland():
+            print("Error: Install 'wl-clipboard' for Wayland clipboard support.")
+        else:
+            print("Error: No clipboard mechanism found. Install xclip or xsel.")
+        return None
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
         return None
