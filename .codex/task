@@ -1,0 +1,222 @@
+# Aether v1.0 – Initial Task Plan
+
+This plan is derived from `aether_v1_codex_spec.md` and mode docs under `.codex/modes`. Tasks are grouped into tiers so work can progress in stages. Each task lists a responsible role, deliverables, and acceptance checks.
+
+## Tier 0 – Foundation
+
+### T0.1 Repository Scaffolding & Dependencies
+- **Role:** Coder
+- **Description:** Create project structure and dependency management for Aether.
+- **Deliverables:**
+  - `/src`, `/configs`, `/ops`, `/security/seccomp`, `/docs` directories
+  - `pyproject.toml` configured for `uv`, `ruff`, `mypy`, `pytest`
+- **Acceptance:** Running `ruff` and `pytest` on empty skeleton succeeds.
+
+### T0.2 Continuous Integration Pipeline
+- **Role:** Coder
+- **Description:** Establish CI using GitHub Actions covering lint, type check, and tests.
+- **Deliverables:** GitHub workflow invoking `ruff`, `mypy`, and `pytest` with coverage gate ≥80%.
+- **Acceptance:** CI passes on repository scaffold.
+
+## Tier 1 – Memory Core
+
+### T1.1 JSONL WAL Engine
+- **Role:** Coder (Memory)
+- **Description:** Implement append-only WAL with retention of 2 GB or 7 days, gzip older than 24 h, nightly index.
+- **Deliverables:** WAL module, rotation logic, unit tests.
+- **Acceptance:** Tests showing log append, retention pruning, gzip, and index rebuild.
+
+### T1.2 Embedding Store Integration
+- **Role:** Coder (Memory)
+- **Description:** Provide interface to Chroma or SQLite-VSS for embeddings with schema in spec.
+- **Deliverables:** Embedding store module, configuration hooks, tests for insert/query.
+- **Acceptance:** Tests retrieving stored vectors with metadata.
+
+### T1.3 Knowledge Graph Integration
+- **Role:** Coder (Memory)
+- **Description:** Connect to Neo4j 5.x using node/relationship schema; include WAL offset references.
+- **Deliverables:** Graph schema setup scripts, adapter module, unit tests.
+- **Acceptance:** Tests creating nodes/relationships and linking to WAL offsets.
+
+### T1.4 Context Stack
+- **Role:** Coder (Memory)
+- **Description:** Implement CTX component managing windows, pins, persona directives.
+- **Deliverables:** Context stack module, tests for push/pop, pin, and windowing.
+- **Acceptance:** Unit tests verifying stack operations persist to WAL.
+
+### T1.5 Curator
+- **Role:** Coder (Memory)
+- **Description:** Curator service for summarization, decay, and pinning with deterministic replay.
+- **Deliverables:** Curator module with automatic mode and operator review queue; tests for deterministic summarization.
+- **Acceptance:** Replay test reproduces identical summaries from same `wal_offset` and `content_sha`.
+
+### T1.6 Hybrid GraphRAG Retrieval
+- **Role:** Coder (Retrieval)
+- **Description:** Combine vector search with k-hop graph traversal and optional manual triple seeding.
+- **Deliverables:** Retrieval module, integration tests with embeddings and KG.
+- **Acceptance:** Test query returns merged context from vector and graph hops.
+
+## Tier 2 – Tooling & Autonomy
+
+### T2.1 Tool Registry & Policy Engine
+- **Role:** Coder (Tooling)
+- **Description:** Implement registry with hash gating, cooldowns, intent-confidence thresholds; deny-by-default policies.
+- **Deliverables:** `configs/tool.yaml` parser, policy engine, tests for gating and cooldown.
+- **Acceptance:** Tests prove unauthorized tools are blocked and cooldown enforced.
+
+### T2.2 Vault Secrets Management
+- **Role:** Coder (Security)
+- **Description:** Local vault using Argon2id master key and AES-GCM; pluggable backend interface.
+- **Deliverables:** Vault module, CLI initialization, unit tests ensuring no plaintext in WAL/logs.
+- **Acceptance:** Tests for encrypt/decrypt round trip and secret retrieval.
+
+### T2.3 Seccomp & Subprocess Jail
+- **Role:** Coder (Security)
+- **Description:** Define baseline/net/no-net profiles and subprocess jail enforcing `no_new_privs` and UID/GID remap.
+- **Deliverables:** Profiles in `/security/seccomp`, jail runner, tests using sample tool.
+- **Acceptance:** Tool executed under chosen profile with restricted syscalls.
+
+### T2.4 Tool Runner with Heat-Shield
+- **Role:** Coder (Tooling)
+- **Description:** Execute tools within sandbox respecting policy engine, track cooldowns and thermal load.
+- **Deliverables:** Tool runner module, telemetry hooks, tests for blocked execution when load high.
+- **Acceptance:** Tests cover allowed run, denied run, and heat-shield trigger.
+
+### T2.5 JWT Session Management
+- **Role:** Coder (Security)
+- **Description:** Short-lived JWT sessions for linklets with rotation.
+- **Deliverables:** JWT issuer/validator, rotation scheduler, unit tests.
+- **Acceptance:** Tests validating token creation, expiry, and refresh.
+
+## Tier 3 – Linklets & Messaging
+
+### T3.1 Linklet Message Bus
+- **Role:** Coder (Messaging)
+- **Description:** Queue with retries and back-pressure between linklets and session router.
+- **Deliverables:** LMB module, configuration, tests simulating retry/back-pressure.
+- **Acceptance:** Messages enqueued, retried, and delivered under load in tests.
+
+### T3.2 Session Router
+- **Role:** Coder (Messaging)
+- **Description:** Map incoming events to sessions/users and persist to WAL.
+- **Deliverables:** Session routing module, tests for session creation and routing accuracy.
+- **Acceptance:** Unit tests showing correct session mapping and WAL entries.
+
+### T3.3 Linklet Framework & Registry
+- **Role:** Coder (Linklets)
+- **Description:** Create interface for linklets, hot-reloadable registry, shared session context with optional isolation.
+- **Deliverables:** Linklet base class, registry loader, tests for reload and isolation mode.
+- **Acceptance:** Tests dynamically add/remove linklets without restart.
+
+### T3.4 Discord Linklet
+- **Role:** Coder (Linklets)
+- **Description:** Implement Discord integration using framework, including per-user sub-contexts.
+- **Deliverables:** Discord linklet module, configuration options, integration tests against mocked Discord API.
+- **Acceptance:** Test message round-trip through LMB and session router.
+
+### T3.5 SSH Linklet
+- **Role:** Coder (Linklets)
+- **Description:** Implement SSH linklet handling interactive sessions.
+- **Deliverables:** SSH linklet module with per-user sub-contexts, integration tests using SSH client library.
+- **Acceptance:** Test interactive command round-trip and session persistence.
+
+### T3.6 Per-User Sub-Context Management
+- **Role:** Coder (Messaging)
+- **Description:** Support sub-contexts within linklets (e.g., Discord channels, SSH users).
+- **Deliverables:** Sub-context module, tests verifying isolation and shared persona behavior.
+- **Acceptance:** Tests show separate histories per user while sharing main session.
+
+## Tier 4 – Inference & Scheduling
+
+### T4.1 Scheduler
+- **Role:** Coder (Inference)
+- **Description:** Select NPU/HIP/CPU based on VRAM, temperature, swap telemetry with graceful failover.
+- **Deliverables:** Scheduler module, telemetry collectors, tests simulating resource thresholds.
+- **Acceptance:** Tests validate accelerator selection and failover order HIP→Vulkan→CPU.
+
+### T4.2 Inference Adapter
+- **Role:** Coder (Inference)
+- **Description:** Route requests to llama.cpp, LiteLLM, or Ollama using models defined in `models.yaml`; support quant presets and flash-attention toggle.
+- **Deliverables:** Adapter module, model config loader, tests with mocked backends.
+- **Acceptance:** Tests confirm model selection and parameter handling.
+
+### T4.3 Dynamic Telemetry & Auto Accelerator Selection
+- **Role:** Coder (Inference)
+- **Description:** Detect available accelerators (NPU > HIP > CPU) and expose metrics for scheduling.
+- **Deliverables:** Hardware detection utilities, telemetry exporters, unit tests.
+- **Acceptance:** Tests emulate hardware availability scenarios.
+
+## Tier 5 – Ops & CLI
+
+### T5.1 `aetherctl` CLI
+- **Role:** Coder (Ops)
+- **Description:** Typer+Rich CLI with subcommands: `selftest`, `bench`, `replay`, `graph seed`.
+- **Deliverables:** CLI module, command implementations, help docs, tests for each command.
+- **Acceptance:** `aetherctl --help` lists commands; tests exercise each subcommand.
+
+### T5.2 Metrics & Logging
+- **Role:** Coder (Ops)
+- **Description:** Expose read-only `/healthz` and `/metrics` endpoints; integrate Prometheus metrics, JSON logs, optional Ntfy notifications.
+- **Deliverables:** HTTP endpoints, metrics registry, logging configuration, tests.
+- **Acceptance:** Integration tests verify endpoints and log format.
+
+### T5.3 Bench Harness
+- **Role:** Coder (Ops)
+- **Description:** Implement `aetherctl bench` measuring tokens/s, latency, VRAM, thermal stats.
+- **Deliverables:** Benchmark module, sample benchmarks, tests with mocked metrics.
+- **Acceptance:** Tests produce structured benchmark output.
+
+### T5.4 Self-Test
+- **Role:** Coder (Ops)
+- **Description:** `aetherctl selftest` checking drivers, accelerators, temps, VRAM, model inventory.
+- **Deliverables:** Self-test module, integration tests simulating missing dependencies.
+- **Acceptance:** Test cases for pass/fail scenarios.
+
+## Tier 6 – Deployment & Security
+
+### T6.1 Multi-Stage Docker Build & SBOM
+- **Role:** Coder (Ops)
+- **Description:** Dockerfile producing ≤1 GB image with SBOM generation and optional sidecars.
+- **Deliverables:** Multi-stage Dockerfile, docker-compose.yml, build script.
+- **Acceptance:** Local build yields image size ≤1 GB and SBOM artifact.
+
+### T6.2 Configuration Surfaces
+- **Role:** Coder (Ops)
+- **Description:** Provide template configs: `models.yaml`, `tool.yaml`, `linklets.yaml`, `curator_policy.yaml` under `/configs`.
+- **Deliverables:** Config files with schema validation and documentation.
+- **Acceptance:** CLI validates configs and loads defaults.
+
+### T6.3 Heat-Shield & Policy Enforcement
+- **Role:** Coder (Security)
+- **Description:** Block tool execution under high load/thermal stress and enforce allowlists per linklet/user.
+- **Deliverables:** Heat-shield module integrated with policy engine; tests simulating overload.
+- **Acceptance:** Tests demonstrate tool blocking when thresholds exceeded.
+
+## Tier 7 – Replay & Recovery
+
+### T7.1 WAL Replay
+- **Role:** Coder (Recovery)
+- **Description:** `aetherctl replay` rebuilds session, context stack, embeddings, and KG from WAL and vault.
+- **Deliverables:** Replay module, deterministic summarization checks, tests restoring state from sample WAL.
+- **Acceptance:** Test shows restored state equals original.
+
+### T7.2 Disaster Recovery Drill
+- **Role:** Coder (Recovery)
+- **Description:** Procedure and automated test ensuring persona state recoverable after WAL + vault replay.
+- **Deliverables:** Documentation in `/docs`, automated script, test verification.
+- **Acceptance:** Simulated crash followed by successful recovery.
+
+## Tier 8 – QA & Benchmarking
+
+### T8.1 RAG Evaluation Pipeline
+- **Role:** Coder (QA)
+- **Description:** Evaluation harness over 500 Q/A pairs targeting F1 ≥88% for GraphRAG.
+- **Deliverables:** Dataset loader, evaluation scripts, CI integration.
+- **Acceptance:** CI job reports F1 score and fails if below threshold.
+
+### T8.2 Manual QA Guides
+- **Role:** Coder (QA)
+- **Description:** Document manual QA procedures for x86 VPS, ARM SBC, and EVO-X2 platforms.
+- **Deliverables:** Guides under `/docs/test-plan/`, covering setup and expected results.
+- **Acceptance:** Peer review confirms clarity and completeness.
+
