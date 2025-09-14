@@ -22,6 +22,10 @@ A versatile command-line utility for copying file contents, directory contents, 
 - xclip or xsel (Linux only)
 - wl-clipboard (Wayland only)
 
+  On CachyOS/Hyprland systems, `wl-clipboard` is required. Wayland detection
+  checks for `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE=wayland`,
+  `HYPRLAND_INSTANCE_SIGNATURE`, or `SWAYSOCK`.
+
 ## Installation
 1. Install package with pipx:
 ```bash

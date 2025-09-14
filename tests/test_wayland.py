@@ -6,10 +6,20 @@ import copybuffer
 def test_is_wayland_detection(monkeypatch):
     monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
     assert copybuffer.is_wayland()
-    monkeypatch.delenv("WAYLAND_DISPLAY")
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+
     monkeypatch.setenv("XDG_SESSION_TYPE", "wayland")
     assert copybuffer.is_wayland()
     monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
+
+    monkeypatch.setenv("HYPRLAND_INSTANCE_SIGNATURE", "1")
+    assert copybuffer.is_wayland()
+    monkeypatch.delenv("HYPRLAND_INSTANCE_SIGNATURE", raising=False)
+
+    monkeypatch.setenv("SWAYSOCK", "/run/user/1000/sway-ipc.sock")
+    assert copybuffer.is_wayland()
+    monkeypatch.delenv("SWAYSOCK", raising=False)
+
     assert not copybuffer.is_wayland()
 
 
