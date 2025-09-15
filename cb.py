@@ -223,29 +223,6 @@ def generate_heredoc_script(file_paths, file_contents_list, append=False) -> str
         lines.append("")
     return "\n".join(lines)
 
-def copy_to_clipboard():
-    # Check if input is from STDIN or file
-    if len(sys.argv) == 1:
-        # Read from STDIN
-        try:
-            content = sys.stdin.read()
-            pyperclip.copy(content)
-        except Exception as e:
-            print(f"Error copying from STDIN: {e}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        # Existing file reading logic
-        try:
-            with open(sys.argv[1], 'r') as file:
-                content = file.read()
-                pyperclip.copy(content)
-        except FileNotFoundError:
-            print(f"Error: File '{sys.argv[1]}' not found", file=sys.stderr)
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-
 def main():
     parser = argparse.ArgumentParser(description="Copy file contents, images, or STDIN input to clipboard.")
     parser.add_argument("--version", action="store_true", help="Display the application version.")
@@ -340,5 +317,5 @@ def main():
 encoding = "cl100k_base"
 
 if __name__ == '__main__':
-    main()  # Use main() instead of copy_to_clipboard()
+    main()
 

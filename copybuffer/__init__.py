@@ -222,29 +222,6 @@ def generate_heredoc_script(
         lines.append("")
     return "\n".join(lines)
 
-def copy_to_clipboard():  # pragma: no cover
-    # Check if input is from STDIN or file
-    if len(sys.argv) == 1:
-        # Read from STDIN
-        try:
-            content = sys.stdin.read()
-            pyperclip.copy(content)
-        except Exception as e:
-            print(f"Error copying from STDIN: {e}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        # Existing file reading logic
-        try:
-            with open(sys.argv[1], 'r') as file:
-                content = file.read()
-                pyperclip.copy(content)
-        except FileNotFoundError:
-            print(f"Error: File '{sys.argv[1]}' not found", file=sys.stderr)
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-
 def get_file_stats(file_path):  # pragma: no cover
     """Get detailed statistics about a file.
     
