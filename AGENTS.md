@@ -15,6 +15,7 @@ Roles map to mode guides in `.codex/modes/`. Read your mode before starting.
 * Reviewer → `.codex/modes/REVIEWER.md`
 * Auditor → `.codex/modes/AUDITOR.md`
 * Blogger → `.codex/modes/BLOGGER.md`
+* Brainstorm → `.codex/modes/BRAINSTORM.md`
 * Swarm Manager → `.codex/modes/SWAMMANAGER.md`
 
 Tasks live in **`.codex/tasks/`** with random hash prefixes. Each task 
