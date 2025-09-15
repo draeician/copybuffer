@@ -79,11 +79,13 @@ cb --append path/to/file1.txt
 - `-a, --attachment`: Format output as Discord attachment
 - `-p, --paste`: Copy a heredoc shell script that recreates the given files when pasted
 - `--append`: Use with `--paste` behavior to append to files instead of overwriting
+- `--image`: Force treating input files as images (images are auto-detected)
 - `--debug`: Enable debug mode
 - `--version`: Display application version
 
 ### Image Support
-Supports copying image files directly to clipboard:
+Supports copying image files directly to clipboard. Image files are detected automatically
+based on their MIME type, or you can force image handling with the `--image` flag:
 - PNG
 - JPG/JPEG
 - BMP
