@@ -44,6 +44,5 @@ target-version = "py39"
 packages = ["copybuffer"]
 
 [project.scripts]
-cb = "copybuffer:main"  # Primary command
-"cb.py" = "copybuffer:main"  # Alias with .py extension
+cb = "copybuffer.main:main"
 

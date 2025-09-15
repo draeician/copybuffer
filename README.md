@@ -1,7 +1,7 @@
 # Clipboard Manager (cb)
 
 ## Description
-A versatile command-line utility for copying file contents, directory contents, or STDIN input to the system clipboard. Supports both text and image files, with special features for Discord formatting and debug output.
+A versatile command-line utility for copying file contents, directory contents, or STDIN input to the system clipboard. Supports both text and image files, with special features for Discord formatting and debug output. The command is installed as `cb` and maps to `copybuffer.main:main`, so it can also be invoked with `python -m copybuffer`.
 
 ## Features
 - Copy text from files to clipboard

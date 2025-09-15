@@ -1,5 +1,9 @@
+from pathlib import Path
 from PIL import Image
-import copybuffer
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from copybuffer import core
 
 
 def create_temp_image(tmp_path):
@@ -17,11 +21,11 @@ def test_copy_image_wayland(monkeypatch, tmp_path):
         captured["cmd"] = cmd
         captured["input"] = input
 
-    monkeypatch.setattr(copybuffer, "is_wayland", lambda: True)
-    monkeypatch.setattr(copybuffer.shutil, "which", lambda cmd: "/usr/bin/" + cmd)
-    monkeypatch.setattr(copybuffer.subprocess, "run", fake_run)
+    monkeypatch.setattr(core, "is_wayland", lambda: True)
+    monkeypatch.setattr(core.shutil, "which", lambda cmd: "/usr/bin/" + cmd)
+    monkeypatch.setattr(core.subprocess, "run", fake_run)
 
-    assert copybuffer.copy_image_to_clipboard(str(path))
+    assert core.copy_image_to_clipboard(str(path))
     assert captured["cmd"][0] == "wl-copy"
     assert captured["cmd"][1:] == ["--type", "image/png"]
     assert captured["input"].startswith(b"\x89PNG")
@@ -38,11 +42,11 @@ def test_copy_image_xclip(monkeypatch, tmp_path):
     def fake_which(cmd):
         return "/usr/bin/xclip" if cmd == "xclip" else None
 
-    monkeypatch.setattr(copybuffer, "is_wayland", lambda: False)
-    monkeypatch.setattr(copybuffer.shutil, "which", fake_which)
-    monkeypatch.setattr(copybuffer.subprocess, "run", fake_run)
+    monkeypatch.setattr(core, "is_wayland", lambda: False)
+    monkeypatch.setattr(core.shutil, "which", fake_which)
+    monkeypatch.setattr(core.subprocess, "run", fake_run)
 
-    assert copybuffer.copy_image_to_clipboard(str(path))
+    assert core.copy_image_to_clipboard(str(path))
     assert captured["cmd"][:4] == ["xclip", "-selection", "clipboard", "-t"]
     assert captured["cmd"][4] == "image/png"
     assert captured["input"].startswith(b"\x89PNG")
