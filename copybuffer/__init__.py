@@ -7,7 +7,10 @@ import shutil
 import sys
 from pathlib import Path
 
+import io
 import mimetypes
+import subprocess
+from PIL import Image
 import pyperclip
 import tiktoken
 
@@ -103,6 +106,71 @@ def copy_file_contents_to_clipboard(
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
         return None
+
+
+def copy_image_to_clipboard(image_path):
+    """Copy an image file to the system clipboard as PNG."""
+    try:
+        img = Image.open(image_path)
+    except FileNotFoundError:
+        print(f"Error: File '{image_path}' not found")
+        return False
+    except Exception as e:
+        print(f"Error: Unable to open image '{image_path}': {e}")
+        return False
+
+    with io.BytesIO() as output:
+        img.save(output, format="PNG")
+        png_data = output.getvalue()
+
+    try:
+        if sys.platform.startswith("linux"):
+            if is_wayland() and shutil.which("wl-copy"):
+                subprocess.run(["wl-copy", "--type", "image/png"], input=png_data, check=True)
+            elif shutil.which("xclip"):
+                subprocess.run([
+                    "xclip",
+                    "-selection",
+                    "clipboard",
+                    "-t",
+                    "image/png",
+                ], input=png_data, check=True)
+            elif shutil.which("xsel"):
+                subprocess.run(
+                    ["xsel", "--clipboard", "--input", "--mime-type", "image/png"],
+                    input=png_data,
+                    check=True,
+                )
+            else:
+                print(
+                    "Error: No clipboard mechanism found. Install wl-clipboard, xclip, or xsel."
+                )
+                return False
+        elif sys.platform == "darwin":
+            subprocess.run(["pbcopy"], input=png_data, check=True)
+        elif sys.platform.startswith("win"):
+            try:
+                import win32clipboard
+                import win32con
+            except ImportError:
+                print("Error: win32clipboard module is required on Windows.")
+                return False
+
+            bmp = img.convert("RGB")
+            with io.BytesIO() as bmp_buffer:
+                bmp.save(bmp_buffer, "BMP")
+                dib_data = bmp_buffer.getvalue()[14:]
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32con.CF_DIB, dib_data)
+            win32clipboard.CloseClipboard()
+        else:
+            print("Error: Unsupported platform for image clipboard operations.")
+            return False
+    except Exception as e:
+        print(f"Error copying image to clipboard: {e}")
+        return False
+    return True
 
 def _choose_unique_heredoc_delimiter(contents: str) -> str:  # pragma: no cover
     """Choose a heredoc delimiter that does not appear in contents.
@@ -288,6 +356,7 @@ def main():  # pragma: no cover
     parser.add_argument("-p", "--paste", action="store_true", help="Format output as a shell heredoc script to create files on paste")
     parser.add_argument("--append", action="store_true", help="Like --paste, but append to the target files instead of overwriting")
     parser.add_argument("-t", "--tokens", action="store_true", help="Display token statistics for the file")
+    parser.add_argument("--image", action="store_true", help="Force treating input files as images")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
@@ -323,6 +392,13 @@ def main():  # pragma: no cover
     file_contents_list = []
     valid_file_paths = []
     for file_path in args.files:
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if args.debug:
+            print(f"Debug: MIME type for {file_path}: {mime_type}")
+        if args.image or (mime_type and mime_type.startswith("image/")):
+            if copy_image_to_clipboard(file_path):
+                print(f"Image '{file_path}' copied to clipboard successfully!")
+            continue
         try:
             with open(file_path, 'r') as file:
                 file_content = file.read().strip()
