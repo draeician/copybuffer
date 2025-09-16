@@ -3,30 +3,34 @@
 > This guide defines how Coders work in the Aether Codex repo. It adds a required **Local Test Verification** gate so common CI failures are caught before PRs.
 
 ## Purpose
+
 Coders implement tasks from `.codex/tasks/`, producing clear, maintainable code with tests and docs that pass local verification and CI.
 
 ## Scope
-- Implement only what the task describes. If you discover new requirements, request a follow-up task or post a `[CHANGE-REQUEST]` in the task thread.
-- Keep changes small and reviewable. Update docs alongside code.
+
+* Implement only what the task describes. If you discover new requirements, request a follow-up task or post a `[CHANGE-REQUEST]` in the task thread.
+* Keep changes small and reviewable. Update docs alongside code.
 
 ## Tooling (Python)
-- Use **uv** for environments and commands.
-- Lint: **ruff**
-- Types: **mypy**
-- Tests: **pytest** with coverage
-- Project uses **src/** layout (`src/aether/...`).
+
+* Use **uv** for environments and commands.
+* Lint: **ruff**
+* Types: **mypy**
+* Tests: **pytest** with coverage
+* Project uses **src/** layout (`src/aether/...`).
 
 ---
 
 ## Local Test Verification (REQUIRED)
+
 Before you open a PR or post `[REVIEW-REQUEST]`, you **must** run the exact CI-equivalent commands locally and ensure they pass:
 
-```bash
+```
 uv sync
 uv run ruff check .
 uv run mypy src
 uv run pytest --cov=src --cov-fail-under=80
-````
+```
 
 If any step fails, fix it before requesting review. Do **not** rely on CI to find these issues.
 
@@ -34,7 +38,7 @@ If any step fails, fix it before requesting review. Do **not** rely on CI to fin
 
 If tests cannot import `aether`, ensure `pyproject.toml` contains:
 
-```toml
+```
 [tool.pytest.ini_options]
 addopts = "-q"
 pythonpath = ["src"]
@@ -49,10 +53,11 @@ When you are ready for review, post a comment in the task thread starting with `
 * Exact command transcript (trimmed) for each local gate above.
 * Python and tool versions:
 
-  ```bash
-  python --version
-  uv --version
-  ```
+```
+python --version
+uv --version
+```
+
 * A brief test summary (number of tests, coverage %).
 * Any known follow-ups or limitations.
 
