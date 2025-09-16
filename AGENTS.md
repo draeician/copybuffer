@@ -114,3 +114,9 @@ A task is done only if:
 > All coder-specific local testing, gates, and templates now live in  
 > **`.codex/modes/CODER.md`**.  
 > Refer there for exact commands, evidence format, and Done criteria.
+
+---
+
+## Note for Coders
+All coder-specific workflow instructions (local test gates, evidence templates, review process) have been moved to  
+**`.codex/modes/CODER.md`** — please refer there for full details.
