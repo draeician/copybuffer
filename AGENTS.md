@@ -1,8 +1,13 @@
 # CopyBuffer — Agents & Communication Guide
 
-This file defines how contributors coordinate work in this repository using 
-ChatGPT Codex and GitHub. It standardizes roles, status signals, and message 
-formats so work is traceable and parallelizable.
+This file defines how contributors coordinate work in this repository using our **Codex tasking system** (not GitHub Copilot) and GitHub. It standardizes roles, status signals, and message formats so work is traceable and parallelizable.
+
+---
+
+## ⚠️ Important Clarification
+
+> **Codex** refers to our internal task management UI at https://chatgpt.com/codex.  
+> It is **not** GitHub Copilot or any IDE autocomplete tool.
 
 ---
 
@@ -16,17 +21,16 @@ Roles map to mode guides in `.codex/modes/`. Read your mode before starting.
 * Auditor → `.codex/modes/AUDITOR.md`
 * Blogger → `.codex/modes/BLOGGER.md`
 * Brainstorm → `.codex/modes/BRAINSTORM.md`
-* Swarm Manager → `.codex/modes/SWAMMANAGER.md`
+* Swarm Manager → `.codex/modes/SWARM MANAGER.md`
 
-Tasks live in **`.codex/tasks/`** with random hash prefixes. Each task 
-includes role, deliverables, and acceptance checks.
+Tasks live in **`.codex/tasks/`** with random hash prefixes. Each task includes role, deliverables, and acceptance checks.
 
 ---
 
 ## 2) Ownership model
 
-* **Self-selection by role**: Coders pick tasks from `.codex/tasks/` that match their role and skills.
-* **Tier gating**: If a tier is active, only pick tasks from that tier. The current tier is noted in `.codex/notes/ACTIVE_TIER.md` when used.
+* **Self-selection by role**: Contributors pick tasks from `.codex/tasks/` matching their role and skills.
+* **Tier gating**: If a tier is active, only pick tasks from that tier (listed in `.codex/notes/ACTIVE_TIER.md`).
 * **One agent per task at a time**: Use `[CLAIM]` to take it. If you stop or hand off, post `[UNCLAIM]`.
 
 ---
@@ -61,36 +65,17 @@ Keep updates concise, action oriented, and link evidence.
 **In GitHub**
 
 * Use the same status signals in PR descriptions and comments.
-* Reference the task file path and hash.
+* Reference the task file path `(.codex/tasks/<hash>-...)`.
 
 ---
 
-## 5) Update templates
+## 5) Commit and PR conventions
 
-**Claim**
-
-```
-```
-
-**WIP**
-
-```
-```
-
-**Blocked**
-
-```
-```
-
-**Review request**
-
-```
-```
-
-**Done**
-
-```
-```
+* Commits: `[TYPE] Title` where TYPE is one of `feat, fix, refactor, test, docs, chore, ci, perf, security`.
+* PRs must link the task file and include:
+  * Summary of change and rationale
+  * Test evidence and coverage notes
+  * Risks and rollback steps
 
 ---
 
@@ -105,17 +90,14 @@ A task is done only if:
 
 ---
 
-## 7) Commit and PR conventions
+## 7) Quick start
 
-Follow the repo guide:
-
-* Commits: `[TYPE] Title` where TYPE is one of `feat, fix, refactor, test, docs, chore, ci, perf, security`.
-* PRs mirror the format and include:
-
-  * Linked task path `(.codex/tasks/<hash>-...)`
-  * Summary of change and rationale
-  * Test evidence and coverage notes
-  * Risks and roll back steps
+- Read your mode guide.
+- Pick a task from `.codex/tasks/` that matches your role.
+- Post `[CLAIM]` with the task path and plan.
+- Implement the work per your mode guide.
+- Keep tests green.
+- Post `[REVIEW-REQUEST]` with evidence, then `[DONE]` when accepted.
 
 ---
 
@@ -123,14 +105,12 @@ Follow the repo guide:
 
 1. Ask in the task thread with `[NEED-INFO]`.
 2. If no response, post `[ESCALATE]` tagging Task Master with the specific question.
-3. If still blocked, create a Reviewer or Auditor follow up per mode guide and link it back.
+3. If still blocked, create a Reviewer or Auditor follow up per their mode guide and link it back.
 
 ---
 
-## 9) Quick start for coders
+## 9) For Coder Workflow
 
-1. Read your mode guide.
-2. Pick a task from `.codex/tasks/` that matches your role.
-3. Post `[CLAIM]` with the task path and plan.
-4. Ship small PRs tied to the task. Keep tests green.
-5. Post `[REVIEW-REQUEST]` with evidence. Then `[DONE]` when accepted.
+> All coder-specific local testing, gates, and templates now live in  
+> **`.codex/modes/CODER.md`**.  
+> Refer there for exact commands, evidence format, and Done criteria.
