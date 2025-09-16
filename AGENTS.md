@@ -129,7 +129,7 @@ Follow the repo guide:
 
 ## 9) Quick start for coders
 
-1. Read your mode guide and the Aether spec sections relevant to your task.
+1. Read your mode guide.
 2. Pick a task from `.codex/tasks/` that matches your role.
 3. Post `[CLAIM]` with the task path and plan.
 4. Ship small PRs tied to the task. Keep tests green.
