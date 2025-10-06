@@ -1,3 +1,4 @@
 pyperclip
 pillow
 tiktoken
+pathspec

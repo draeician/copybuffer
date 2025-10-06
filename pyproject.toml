@@ -22,7 +22,8 @@ classifiers = [
 dependencies = [
     "pyperclip",
     "Pillow",
-    "tiktoken"
+    "tiktoken",
+    "pathspec"
 ]
 
 [project.optional-dependencies]
