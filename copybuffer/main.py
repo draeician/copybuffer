@@ -9,6 +9,12 @@ import pyperclip
 import tiktoken
 from pathspec import PathSpec
 
+DEFAULT_IGNORE_PATTERNS = [
+    ".git",
+    ".git/",
+    ".git/**",
+]
+
 from .core import (
     __VERSION__,
     check_dependencies,
@@ -30,9 +36,11 @@ class FileEntry:
 
 def _load_gitignore_spec(base_dir: Path) -> PathSpec | None:
     gitignore_path = base_dir / ".gitignore"
-    if not gitignore_path.is_file():
+    lines: List[str] = list(DEFAULT_IGNORE_PATTERNS)
+    if gitignore_path.is_file():
+        lines.extend(gitignore_path.read_text().splitlines())
+    if not lines:
         return None
-    lines = gitignore_path.read_text().splitlines()
     return PathSpec.from_lines("gitwildmatch", lines)
 
 
@@ -139,13 +147,11 @@ def discover_files(
             continue
 
         if candidate.is_dir():
-            if not include_directory and not recursive:
-                directory_errors.append(raw_path)
-                continue
+            effective_recursive = recursive or (not include_directory)
             dir_text, dir_images = _discover_directory(
                 raw_path,
                 candidate,
-                recursive,
+                effective_recursive,
                 allow_images,
                 spec,
                 base_dir,
