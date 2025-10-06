@@ -6,7 +6,9 @@ A versatile command-line utility for copying file contents, directory contents, 
 ## Features
 - Copy text from files to clipboard
 - Copy text from STDIN to clipboard
-- Copy contents of all files in a directory
+- Copy contents of all files in a directory (non-recursive by default)
+- Recursively expand directories when needed
+- Honor `.gitignore` patterns while scanning directories
 - Copy images to clipboard
 - Include headers with filenames
 - Format output for Discord
@@ -55,8 +57,11 @@ cb filename.txt
 # Copy from STDIN
 echo "hello" | cb
 
-# Copy directory contents
+# Copy directory contents (non-recursive)
 cb -d directory/
+
+# Copy directory contents recursively
+cb -r directory/
 
 # Copy with Discord formatting
 cb -a filename.txt
@@ -74,12 +79,13 @@ cb --append path/to/file1.txt
 ### Options
 - `file`: File to copy (optional - reads from STDIN if not provided)
 - `-i, --include-header`: Include filename as header in copied text
-- `-d, --directory`: Copy contents of all files in directory
+- `-d, --directory`: Copy contents of all files in directory (non-recursive)
+- `-r, --recursive`: Recursively copy contents of provided directories
 - `-v, --verbose`: Display the copied contents
 - `-a, --attachment`: Format output as Discord attachment
 - `-p, --paste`: Copy a heredoc shell script that recreates the given files when pasted
 - `--append`: Use with `--paste` behavior to append to files instead of overwriting
-- `--image`: Force treating input files as images (images are auto-detected)
+- `--image`: Include image files discovered when expanding directories
 - `--debug`: Enable debug mode
 - `--version`: Display application version
 
@@ -101,8 +107,10 @@ Copy contents of all text files in a directory:
 cb -d /path/to/directory
 ```
 - Automatically skips image files
+- Uses `.gitignore` rules from the current working directory
 - Optionally includes headers with -i flag
 - Can format as Discord attachments with -a flag
+- Use `-r` to walk directories recursively and include nested files
 
 ### Debug Mode
 Enable detailed output for troubleshooting:

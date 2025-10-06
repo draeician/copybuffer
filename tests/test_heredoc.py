@@ -37,11 +37,13 @@ def test_generate_heredoc_script(tmp_path, append):
         "file1.txt",
         "dir with space/file2.txt",
         "weird 'quote'/file3.txt",
+        "nested/deeper/path/file4.txt",
     ]
     contents = [
         "alpha",
         "beta with $dollar and `backticks`",
         "gamma\nmulti-line\ncontent",
+        "delta\nwith nested dirs",
     ]
 
     if append:
@@ -56,6 +58,7 @@ def test_generate_heredoc_script(tmp_path, append):
     assert f"cat {redir} 'file1.txt'" in script_text
     assert _shell_single_quote("dir with space/file2.txt") in script_text
     assert _shell_single_quote("weird 'quote'/file3.txt") in script_text
+    assert _shell_single_quote("nested/deeper/path/file4.txt") in script_text
 
     delims = re.findall(r"<< '([^']+)'", script_text)
     assert len(delims) == len(file_paths)
