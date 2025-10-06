@@ -59,3 +59,44 @@ def test_discover_files_honors_gitignore_and_images(tmp_path, monkeypatch):
 
     assert _as_relative_paths(text_entries) == ["data/kept.txt"]
     assert _as_relative_paths(image_entries) == ["data/picture.png"]
+
+
+def test_directory_argument_implies_recursive(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    base = Path("project")
+    nested = base / "nested"
+    (tmp_path / base).mkdir()
+    (tmp_path / nested).mkdir()
+    (tmp_path / base / "top.txt").write_text("root")
+    (tmp_path / nested / "inner.txt").write_text("deep")
+
+    text_entries, image_entries, missing, directory_errors = discover_files(
+        [str(base)], include_directory=False, recursive=False, allow_images=False
+    )
+
+    assert missing == []
+    assert directory_errors == []
+    assert _as_relative_paths(text_entries) == [
+        "project/nested/inner.txt",
+        "project/top.txt",
+    ]
+    assert image_entries == []
+
+
+def test_discover_files_skips_git_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    base = Path("repo")
+    git_dir = base / ".git"
+    (tmp_path / base).mkdir()
+    (tmp_path / git_dir).mkdir()
+    (tmp_path / base / "keep.txt").write_text("keep")
+    (tmp_path / git_dir / "HEAD").write_text("ref")
+
+    text_entries, image_entries, missing, directory_errors = discover_files(
+        [str(base)], include_directory=False, recursive=False, allow_images=False
+    )
+
+    assert missing == []
+    assert directory_errors == []
+    assert _as_relative_paths(text_entries) == ["repo/keep.txt"]
+    assert image_entries == []
