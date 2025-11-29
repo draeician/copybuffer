@@ -1,5 +1,7 @@
 __pycache__
 *.log
+venv/
+.venv/
 
 .cursorrules
 .cursorrules.bak
