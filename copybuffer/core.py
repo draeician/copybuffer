@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image
 import pyperclip
 
-__VERSION__ = "1.8.0"
+__VERSION__ = "1.9.0"
 
 
 def is_wayland() -> bool:

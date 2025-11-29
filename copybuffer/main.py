@@ -260,6 +260,43 @@ def main():  # pragma: no cover
         content = sys.stdin.read().strip()
         if args.debug:
             print(f"Debug: Read from STDIN: {content}")
+        
+        # Handle token counting for STDIN
+        if args.tokens:
+            # Calculate text statistics
+            lines = content.splitlines()
+            words = content.split()
+            char_count = len(content)
+            char_no_spaces = len(content.replace(' ', '').replace('\n', '').replace('\r', ''))
+            
+            # Calculate token count
+            enc = tiktoken.get_encoding(encoding)
+            tokens = enc.encode(content)
+            token_count = len(tokens)
+            
+            # Display statistics
+            avg_line_length = char_count / len(lines) if lines else 0.00
+            avg_word_length = sum(len(word) for word in words) / len(words) if words else 0.00
+            avg_bytes_per_token = char_count / token_count if token_count > 0 else 0.00
+            tokens_per_word = token_count / len(words) if words and len(words) > 0 else 0.00
+            
+            output = [
+                "\nSTDIN Input Statistics",
+                "=" * 25,
+                "\nText Statistics:",
+                f"Lines: {len(lines):,}",
+                f"Words: {len(words):,}",
+                f"Characters (with spaces): {char_count:,}",
+                f"Characters (no spaces): {char_no_spaces:,}",
+                f"Average Line Length: {avg_line_length:.2f} characters",
+                f"Average Word Length: {avg_word_length:.2f} characters",
+                "\nToken Statistics:",
+                f"Token Count: {token_count:,}",
+                f"Avg Bytes per Token: {avg_bytes_per_token:.2f}" if token_count > 0 else "Avg Bytes per Token: N/A",
+                f"Tokens per Word: {tokens_per_word:.2f}" if words and len(words) > 0 else "Tokens per Word: N/A",
+            ]
+            print('\n'.join(output))
+        
         combined_contents = copy_file_contents_to_clipboard(
             [content], args.include_header, args.attachment, debug=args.debug
         )
