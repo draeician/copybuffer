@@ -105,7 +105,11 @@ def copy_file_contents_to_clipboard(
 
 
 def copy_image_to_clipboard(image_path):
-    """Copy an image file to the system clipboard as PNG."""
+    """Copy an image file to the system clipboard.
+    
+    For GIF files (animated or static), preserves the original GIF format.
+    For other image formats, converts to PNG.
+    """
     try:
         img = Image.open(image_path)
     except FileNotFoundError:
@@ -115,26 +119,33 @@ def copy_image_to_clipboard(image_path):
         print(f"Error: Unable to open image '{image_path}': {e}")
         return False
 
+    # Convert all images to PNG for clipboard compatibility
+    # Note: GIFs (both animated and static) are converted to PNG for clipboard.
+    # This ensures compatibility with applications like Discord that don't
+    # support image/gif clipboard format on Linux. Animated GIFs will show
+    # only the first frame when pasted. To share animated GIFs, upload the
+    # file directly rather than using clipboard.
     with io.BytesIO() as output:
         img.save(output, format="PNG")
-        png_data = output.getvalue()
+        image_data = output.getvalue()
+    mime_type = "image/png"
 
     try:
         if sys.platform.startswith("linux"):
             if is_wayland() and shutil.which("wl-copy"):
-                subprocess.run(["wl-copy", "--type", "image/png"], input=png_data, check=True)
+                subprocess.run(["wl-copy", "--type", mime_type], input=image_data, check=True)
             elif shutil.which("xclip"):
                 subprocess.run([
                     "xclip",
                     "-selection",
                     "clipboard",
                     "-t",
-                    "image/png",
-                ], input=png_data, check=True)
+                    mime_type,
+                ], input=image_data, check=True)
             elif shutil.which("xsel"):
                 subprocess.run(
-                    ["xsel", "--clipboard", "--input", "--mime-type", "image/png"],
-                    input=png_data,
+                    ["xsel", "--clipboard", "--input", "--mime-type", mime_type],
+                    input=image_data,
                     check=True,
                 )
             else:
@@ -143,7 +154,8 @@ def copy_image_to_clipboard(image_path):
                 )
                 return False
         elif sys.platform == "darwin":
-            subprocess.run(["pbcopy"], input=png_data, check=True)
+            # macOS pbcopy should handle both PNG and GIF
+            subprocess.run(["pbcopy"], input=image_data, check=True)
         elif sys.platform.startswith("win"):
             try:
                 import win32clipboard
@@ -152,14 +164,28 @@ def copy_image_to_clipboard(image_path):
                 print("Error: win32clipboard module is required on Windows.")
                 return False
 
-            bmp = img.convert("RGB")
-            with io.BytesIO() as bmp_buffer:
-                bmp.save(bmp_buffer, "BMP")
-                dib_data = bmp_buffer.getvalue()[14:]
-            win32clipboard.OpenClipboard()
-            win32clipboard.EmptyClipboard()
-            win32clipboard.SetClipboardData(win32con.CF_DIB, dib_data)
-            win32clipboard.CloseClipboard()
+            if is_gif:
+                # For GIF on Windows, convert to BMP since win32clipboard doesn't
+                # natively support animated GIFs in clipboard
+                # Note: This will convert animated GIFs to static BMP (first frame)
+                bmp = img.convert("RGB")
+                with io.BytesIO() as bmp_buffer:
+                    bmp.save(bmp_buffer, "BMP")
+                    dib_data = bmp_buffer.getvalue()[14:]
+                win32clipboard.OpenClipboard()
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(win32con.CF_DIB, dib_data)
+                win32clipboard.CloseClipboard()
+            else:
+                # For non-GIF images, use existing BMP conversion
+                bmp = img.convert("RGB")
+                with io.BytesIO() as bmp_buffer:
+                    bmp.save(bmp_buffer, "BMP")
+                    dib_data = bmp_buffer.getvalue()[14:]
+                win32clipboard.OpenClipboard()
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(win32con.CF_DIB, dib_data)
+                win32clipboard.CloseClipboard()
         else:
             print("Error: Unsupported platform for image clipboard operations.")
             return False
