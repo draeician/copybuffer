@@ -109,8 +109,18 @@ def read_with_encoding(file_path: Union[Path, str]) -> Tuple[str, str]:
         elif detected_encoding == 'utf-8' and data[:3] == b'\xef\xbb\xbf':
             data = data[3:]
     
+    # Handle truncated UTF-16 data (must be even number of bytes)
+    if detected_encoding in ('utf-16-le', 'utf-16-be', 'utf-16'):
+        if len(data) % 2 != 0:
+            # Truncated UTF-16 data - strip last byte and decode with error handling
+            data = data[:-1]
+    
     # Decode with detected encoding
-    content = data.decode(detected_encoding)
+    # Use 'replace' for UTF-16 to handle any remaining truncation issues
+    if detected_encoding in ('utf-16-le', 'utf-16-be', 'utf-16'):
+        content = data.decode(detected_encoding, errors='replace')
+    else:
+        content = data.decode(detected_encoding)
     
     return content, detected_encoding
 
@@ -140,8 +150,18 @@ def read_stdin_with_encoding() -> Tuple[str, str]:
         elif detected_encoding == 'utf-8' and data[:3] == b'\xef\xbb\xbf':
             data = data[3:]
     
+    # Handle truncated UTF-16 data (must be even number of bytes)
+    if detected_encoding in ('utf-16-le', 'utf-16-be', 'utf-16'):
+        if len(data) % 2 != 0:
+            # Truncated UTF-16 data - strip last byte and decode with error handling
+            data = data[:-1]
+    
     # Decode with detected encoding
-    content = data.decode(detected_encoding)
+    # Use 'replace' for UTF-16 to handle any remaining truncation issues
+    if detected_encoding in ('utf-16-le', 'utf-16-be', 'utf-16'):
+        content = data.decode(detected_encoding, errors='replace')
+    else:
+        content = data.decode(detected_encoding)
     
     return content, detected_encoding
 
