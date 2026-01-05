@@ -14,31 +14,57 @@ import pyperclip
 __VERSION__ = "1.9.1"
 
 
-def detect_encoding(data: bytes) -> Union[str, None]:
+def detect_encoding(data: bytes) -> Tuple[Union[str, None], bool]:
     """Detect the encoding of byte data.
     
-    Tries chardet if available, then falls back to trying common encodings.
+    Checks for BOMs first, then tries chardet if available, then falls back to common encodings.
     
     Args:
         data: Byte data to detect encoding for
         
     Returns:
-        Encoding name if detected, None if all attempts fail
+        Tuple of (encoding_name, has_bom) where has_bom indicates if a BOM was found
     """
+    # Check for BOMs first (most reliable indicator)
+    if len(data) >= 2:
+        # UTF-16-LE BOM: FF FE
+        if data[:2] == b'\xff\xfe':
+            return 'utf-16-le', True
+        # UTF-16-BE BOM: FE FF
+        if data[:2] == b'\xfe\xff':
+            return 'utf-16-be', True
+        # UTF-8 BOM: EF BB BF
+        if len(data) >= 3 and data[:3] == b'\xef\xbb\xbf':
+            return 'utf-8', True
+    
     # Try chardet if available
     try:
         import chardet
         result = chardet.detect(data)
         if result and result.get('encoding') and result.get('confidence', 0) > 0.7:
-            return result['encoding']
+            encoding = result['encoding']
+            # Normalize encoding names
+            if encoding.lower() in ('utf-16', 'utf16'):
+                # chardet might return 'utf-16' but we need to determine endianness
+                # Try both and see which works
+                try:
+                    data.decode('utf-16-le')
+                    return 'utf-16-le', False
+                except UnicodeDecodeError:
+                    try:
+                        data.decode('utf-16-be')
+                        return 'utf-16-be', False
+                    except UnicodeDecodeError:
+                        return 'utf-16', False
+            return encoding, False
     except ImportError:
         pass
     
     # Fallback: try common encodings in order
     encodings_to_try = [
         'utf-8',
-        'utf-16-be',
         'utf-16-le',
+        'utf-16-be',
         'utf-16',
         'latin-1',
     ]
@@ -47,11 +73,11 @@ def detect_encoding(data: bytes) -> Union[str, None]:
         try:
             # Try to decode with this encoding
             data.decode(encoding)
-            return encoding
+            return encoding, False
         except (UnicodeDecodeError, LookupError):
             continue
     
-    return None
+    return None, False
 
 
 def read_with_encoding(file_path: Union[Path, str]) -> Tuple[str, str]:
@@ -69,17 +95,22 @@ def read_with_encoding(file_path: Union[Path, str]) -> Tuple[str, str]:
     path = Path(file_path)
     data = path.read_bytes()
     
-    detected_encoding = detect_encoding(data)
+    detected_encoding, has_bom = detect_encoding(data)
     if detected_encoding is None:
         # Last resort: try utf-8 with errors='replace'
         return data.decode('utf-8', errors='replace'), 'utf-8'
     
+    # Strip BOM bytes if present (before decoding)
+    if has_bom:
+        if detected_encoding == 'utf-16-le' and data[:2] == b'\xff\xfe':
+            data = data[2:]
+        elif detected_encoding == 'utf-16-be' and data[:2] == b'\xfe\xff':
+            data = data[2:]
+        elif detected_encoding == 'utf-8' and data[:3] == b'\xef\xbb\xbf':
+            data = data[3:]
+    
     # Decode with detected encoding
     content = data.decode(detected_encoding)
-    
-    # Strip BOM if present (UTF-16 variants may have BOM)
-    if content.startswith('\ufeff'):
-        content = content[1:]
     
     return content, detected_encoding
 
@@ -95,17 +126,22 @@ def read_stdin_with_encoding() -> Tuple[str, str]:
     """
     data = sys.stdin.buffer.read()
     
-    detected_encoding = detect_encoding(data)
+    detected_encoding, has_bom = detect_encoding(data)
     if detected_encoding is None:
         # Last resort: try utf-8 with errors='replace'
         return data.decode('utf-8', errors='replace'), 'utf-8'
     
+    # Strip BOM bytes if present (before decoding)
+    if has_bom:
+        if detected_encoding == 'utf-16-le' and data[:2] == b'\xff\xfe':
+            data = data[2:]
+        elif detected_encoding == 'utf-16-be' and data[:2] == b'\xfe\xff':
+            data = data[2:]
+        elif detected_encoding == 'utf-8' and data[:3] == b'\xef\xbb\xbf':
+            data = data[3:]
+    
     # Decode with detected encoding
     content = data.decode(detected_encoding)
-    
-    # Strip BOM if present
-    if content.startswith('\ufeff'):
-        content = content[1:]
     
     return content, detected_encoding
 
