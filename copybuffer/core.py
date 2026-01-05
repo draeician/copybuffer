@@ -6,11 +6,108 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Tuple, Union
 
 from PIL import Image
 import pyperclip
 
-__VERSION__ = "1.9.0"
+__VERSION__ = "1.9.1"
+
+
+def detect_encoding(data: bytes) -> Union[str, None]:
+    """Detect the encoding of byte data.
+    
+    Tries chardet if available, then falls back to trying common encodings.
+    
+    Args:
+        data: Byte data to detect encoding for
+        
+    Returns:
+        Encoding name if detected, None if all attempts fail
+    """
+    # Try chardet if available
+    try:
+        import chardet
+        result = chardet.detect(data)
+        if result and result.get('encoding') and result.get('confidence', 0) > 0.7:
+            return result['encoding']
+    except ImportError:
+        pass
+    
+    # Fallback: try common encodings in order
+    encodings_to_try = [
+        'utf-8',
+        'utf-16-be',
+        'utf-16-le',
+        'utf-16',
+        'latin-1',
+    ]
+    
+    for encoding in encodings_to_try:
+        try:
+            # Try to decode with this encoding
+            data.decode(encoding)
+            return encoding
+        except (UnicodeDecodeError, LookupError):
+            continue
+    
+    return None
+
+
+def read_with_encoding(file_path: Union[Path, str]) -> Tuple[str, str]:
+    """Read a file and detect its encoding.
+    
+    Args:
+        file_path: Path to the file to read
+        
+    Returns:
+        Tuple of (content, encoding_used)
+        
+    Raises:
+        UnicodeDecodeError: If encoding detection fails and all fallbacks fail
+    """
+    path = Path(file_path)
+    data = path.read_bytes()
+    
+    detected_encoding = detect_encoding(data)
+    if detected_encoding is None:
+        # Last resort: try utf-8 with errors='replace'
+        return data.decode('utf-8', errors='replace'), 'utf-8'
+    
+    # Decode with detected encoding
+    content = data.decode(detected_encoding)
+    
+    # Strip BOM if present (UTF-16 variants may have BOM)
+    if content.startswith('\ufeff'):
+        content = content[1:]
+    
+    return content, detected_encoding
+
+
+def read_stdin_with_encoding() -> Tuple[str, str]:
+    """Read from stdin and detect encoding.
+    
+    Returns:
+        Tuple of (content, encoding_used)
+        
+    Raises:
+        UnicodeDecodeError: If encoding detection fails and all fallbacks fail
+    """
+    data = sys.stdin.buffer.read()
+    
+    detected_encoding = detect_encoding(data)
+    if detected_encoding is None:
+        # Last resort: try utf-8 with errors='replace'
+        return data.decode('utf-8', errors='replace'), 'utf-8'
+    
+    # Decode with detected encoding
+    content = data.decode(detected_encoding)
+    
+    # Strip BOM if present
+    if content.startswith('\ufeff'):
+        content = content[1:]
+    
+    return content, detected_encoding
 
 
 def is_wayland() -> bool:
@@ -119,6 +216,9 @@ def copy_image_to_clipboard(image_path):
         print(f"Error: Unable to open image '{image_path}': {e}")
         return False
 
+    # Determine image format
+    is_gif = img.format and img.format.upper() == 'GIF'
+    
     # Convert all images to PNG for clipboard compatibility
     # Note: GIFs (both animated and static) are converted to PNG for clipboard.
     # This ensures compatibility with applications like Discord that don't
@@ -249,7 +349,7 @@ def copy_to_clipboard():  # pragma: no cover
     if len(sys.argv) == 1:
         # Read from STDIN
         try:
-            content = sys.stdin.read()
+            content, _ = read_stdin_with_encoding()
             pyperclip.copy(content)
         except Exception as e:
             print(f"Error copying from STDIN: {e}", file=sys.stderr)
@@ -257,9 +357,8 @@ def copy_to_clipboard():  # pragma: no cover
     else:
         # Existing file reading logic
         try:
-            with open(sys.argv[1], 'r') as file:
-                content = file.read()
-                pyperclip.copy(content)
+            content, _ = read_with_encoding(sys.argv[1])
+            pyperclip.copy(content)
         except FileNotFoundError:
             print(f"Error: File '{sys.argv[1]}' not found", file=sys.stderr)
             sys.exit(1)
@@ -297,19 +396,18 @@ def get_file_stats(file_path):  # pragma: no cover
     # Add text statistics if it's a text file
     if not file_stats['is_binary']:
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                lines = content.splitlines()
-                words = content.split()
-                
-                file_stats.update({
-                    'line_count': len(lines),
-                    'word_count': len(words),
-                    'char_count': len(content),
-                    'char_no_spaces': len(content.replace(' ', '').replace('\n', '').replace('\r', '')),
-                    'avg_line_length': len(content) / len(lines) if lines else 0,
-                    'avg_word_length': sum(len(word) for word in words) / len(words) if words else 0,
-                })
+            content, _ = read_with_encoding(file_path)
+            lines = content.splitlines()
+            words = content.split()
+            
+            file_stats.update({
+                'line_count': len(lines),
+                'word_count': len(words),
+                'char_count': len(content),
+                'char_no_spaces': len(content.replace(' ', '').replace('\n', '').replace('\r', '')),
+                'avg_line_length': len(content) / len(lines) if lines else 0,
+                'avg_word_length': sum(len(word) for word in words) / len(words) if words else 0,
+            })
         except Exception as e:
             file_stats['text_stats_error'] = str(e)
     
@@ -372,6 +470,9 @@ encoding = "cl100k_base"
 
 __all__ = [
     "__VERSION__",
+    "detect_encoding",
+    "read_with_encoding",
+    "read_stdin_with_encoding",
     "is_wayland",
     "is_wlclipboard_installed",
     "is_xclip_installed",

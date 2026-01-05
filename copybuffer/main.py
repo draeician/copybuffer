@@ -25,6 +25,8 @@ from .core import (
     format_file_stats,
     install_dependencies,
     encoding,
+    read_stdin_with_encoding,
+    read_with_encoding,
 )
 
 
@@ -257,9 +259,14 @@ def main():  # pragma: no cover
         if args.paste or args.append:
             print("Error: --paste/--append require file paths to determine output destinations.")
             return
-        content = sys.stdin.read().strip()
-        if args.debug:
-            print(f"Debug: Read from STDIN: {content}")
+        try:
+            content, detected_encoding = read_stdin_with_encoding()
+            content = content.strip()
+            if args.debug:
+                print(f"Debug: Read from STDIN (encoding: {detected_encoding}): {content}")
+        except Exception as e:
+            print(f"Error reading from STDIN: {e}")
+            return
         
         # Handle token counting for STDIN
         if args.tokens:
@@ -322,8 +329,10 @@ def main():  # pragma: no cover
     valid_file_paths: List[str] = []
     for entry in text_entries:
         try:
-            with entry.abs_path.open("r") as file:
-                file_content = file.read().strip()
+            file_content, detected_encoding = read_with_encoding(entry.abs_path)
+            file_content = file_content.strip()
+            if args.debug:
+                print(f"Debug: Read file {entry.abs_path} (encoding: {detected_encoding})")
         except FileNotFoundError:
             print(f"Error: File '{entry.display_path}' not found")
             continue
@@ -380,10 +389,9 @@ def main():  # pragma: no cover
                 token_count = None
 
                 if not stats["is_binary"]:
-                    with entry.abs_path.open("r") as file:
-                        content = file.read()
-                        tokens = enc.encode(content)
-                        token_count = len(tokens)
+                    content, detected_encoding = read_with_encoding(entry.abs_path)
+                    tokens = enc.encode(content)
+                    token_count = len(tokens)
 
                 print(format_file_stats(entry.display_path, stats, token_count))
 

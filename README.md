@@ -122,7 +122,7 @@ cb --debug filename.txt
 ```bash
 # Display version information
 cb --version
-# Output: copybuffer version 1.8.0
+# Output: copybuffer version 1.9.1
 ```
 
 ## Error Handling
