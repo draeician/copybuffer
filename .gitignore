@@ -1,10 +1,39 @@
-__pycache__
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.log
+
+# Virtual envs
 venv/
 .venv/
+ENV/
+env/
 
+# Packaging / tooling
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets / local env
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+
+# Local IDE dumps (optional personal overrides)
 .cursorrules
 .cursorrules.bak
+CLAUDE.local.md
 
-project_spec.md
+# Local scratch
 copybuffer.txt
+*.swp
+*.swo
+.DS_Store

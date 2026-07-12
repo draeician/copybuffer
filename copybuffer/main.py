@@ -23,6 +23,7 @@ from .core import (
     generate_heredoc_script,
     get_file_stats,
     format_file_stats,
+    get_linux_file_metadata,
     install_dependencies,
     encoding,
     read_stdin_with_encoding,
@@ -327,6 +328,7 @@ def main():  # pragma: no cover
 
     file_contents_list: List[str] = []
     valid_file_paths: List[str] = []
+    valid_abs_paths: List[Path] = []
     for entry in text_entries:
         try:
             file_content, detected_encoding = read_with_encoding(entry.abs_path)
@@ -342,6 +344,7 @@ def main():  # pragma: no cover
 
         file_contents_list.append(file_content)
         valid_file_paths.append(entry.display_path)
+        valid_abs_paths.append(entry.abs_path)
         if args.debug:
             print(f"Debug: Read file {entry.abs_path}")
 
@@ -355,8 +358,15 @@ def main():  # pragma: no cover
 
     if file_contents_list:
         if args.paste or args.append:
+            # Capture owner/group/mode on Linux only; None elsewhere or on failure.
+            metadata_list = [
+                get_linux_file_metadata(abs_path) for abs_path in valid_abs_paths
+            ]
             script_text = generate_heredoc_script(
-                valid_file_paths, file_contents_list, append=args.append
+                valid_file_paths,
+                file_contents_list,
+                append=args.append,
+                metadata_list=metadata_list,
             )
             try:
                 pyperclip.copy(script_text)

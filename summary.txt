@@ -1,6 +1,6 @@
 Project summary:
-- CLI clipboard utility for copying files/STDIN
-- New: -p/--paste and --append (heredoc generation)
-- Preserved -a/--attachment for Discord formatting
-- Version 1.7.0; README and CHANGELOG updated
-- Removed TODO.md; added final_review_gate.py; updated instructions.txt
+- CLI clipboard utility (cb) for files/STDIN/images; package copybuffer 1.9.0
+- Features: headers, Discord -a, heredoc -p/--append, recursive -r, tokens -t, Wayland
+- Grok Build initialized (2026-07-12): AGENTS.md, GROK.md, .grok/{rules,agents}, .crules/
+- Legacy .codex/ retained; prefer .crules + .grok for new agent work
+- project_spec.md refreshed to match real CLI/packaging; now trackable in git

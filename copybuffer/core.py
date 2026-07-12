@@ -11,7 +11,7 @@ from typing import Tuple, Union
 from PIL import Image
 import pyperclip
 
-__VERSION__ = "1.9.1"
+__VERSION__ = "1.10.0"
 
 
 def detect_encoding(data: bytes) -> Tuple[Union[str, None], bool]:
@@ -368,35 +368,154 @@ def _choose_unique_heredoc_delimiter(contents: str) -> str:  # pragma: no cover
             return candidate
     return base + secrets.token_hex(16).upper()
 
-def _shell_single_quote(value: str) -> str:  # pragma: no cover
+def _shell_single_quote(value: str) -> str:
     """Safely single-quote a string for POSIX shell.
 
-    Replaces single quotes using the standard pattern: ' -> '\''
+    Replaces single quotes using the standard pattern: ' -> '\\'' .
     """
     return "'" + value.replace("'", "'\\''") + "'"
 
-def generate_heredoc_script(
-    file_paths, file_contents_list, append: bool = False
-) -> str:  # pragma: no cover
-    """Generate a shell script using heredoc to create or append files with their contents.
+
+def get_linux_file_metadata(path) -> dict | None:
+    """Return Linux owner/group/mode for a path, or None if unavailable.
+
+    Only works on Linux. Uses the numeric uid/gid resolved to names via
+    :mod:`pwd` and :mod:`grp`. Mode is the permission bits only (e.g. ``0o644``).
 
     Args:
-        file_paths: List of file paths corresponding to the contents provided.
-        file_contents_list: List of file contents as strings.
-        append: If True, appends to files (>>); otherwise overwrites (>)
+        path: Filesystem path to inspect.
+
+    Returns:
+        Dict with keys ``owner``, ``group``, ``mode`` (int), or None.
+    """
+    if not sys.platform.startswith("linux"):
+        return None
+    try:
+        import grp
+        import pwd
+        import stat as stat_mod
+
+        st = Path(path).stat()
+        owner = pwd.getpwuid(st.st_uid).pw_name
+        group = grp.getgrgid(st.st_gid).gr_name
+        mode = stat_mod.S_IMODE(st.st_mode)
+        return {"owner": owner, "group": group, "mode": mode}
+    except (OSError, KeyError, AttributeError):
+        return None
+
+
+def _emit_write_permission_check(quoted_path: str) -> list[str]:
+    """Emit bash that aborts if the destination is not writable.
+
+    Checks the nearest existing ancestor of the destination directory, then
+    the destination itself if it already exists. On failure prints to stderr
+    and exits non-zero so no content is written.
+    """
+    # Use a subshell-friendly block with local-ish temps via unique vars
+    # scoped per-file by using dest path only in quoted form.
+    return [
+        f"_cb_dest={quoted_path}",
+        '_cb_dir="$(dirname -- "$_cb_dest")"',
+        '_cb_check="$_cb_dir"',
+        'while [ ! -e "$_cb_check" ] && [ "$_cb_check" != "/" ] && [ "$_cb_check" != "." ]; do',
+        '  _cb_check="$(dirname -- "$_cb_check")"',
+        "done",
+        'if [ ! -w "$_cb_check" ]; then',
+        '  echo "Error: no write permission for \'$_cb_check\' (needed for \'$_cb_dest\')" >&2',
+        "  exit 1",
+        "fi",
+        'if [ -e "$_cb_dest" ] && [ ! -w "$_cb_dest" ]; then',
+        '  echo "Error: no write permission for \'$_cb_dest\'" >&2',
+        "  exit 1",
+        "fi",
+    ]
+
+
+def _emit_linux_perm_restore(quoted_path: str, owner: str, group: str, mode: int) -> list[str]:
+    """Emit bash to restore mode/owner only when safe.
+
+    - ``chmod`` runs only if the pasting user owns the file or is root.
+    - ``chown`` runs only if the owner name exists on the target system
+      (group is included when that group exists).
+    """
+    quoted_owner = _shell_single_quote(owner)
+    quoted_group = _shell_single_quote(group)
+    mode_oct = format(mode, "04o")
+    return [
+        f"_cb_dest={quoted_path}",
+        # chmod only when root or we own the file (-O)
+        'if [ "$(id -u)" -eq 0 ] || [ -O "$_cb_dest" ]; then',
+        f'  chmod {mode_oct} -- "$_cb_dest" 2>/dev/null || true',
+        "fi",
+        # chown only when the source owner account exists here
+        f"if id -u {quoted_owner} >/dev/null 2>&1; then",
+        f"  if getent group {quoted_group} >/dev/null 2>&1; then",
+        f"    chown {quoted_owner}:{quoted_group} -- \"$_cb_dest\" 2>/dev/null || true",
+        "  else",
+        f"    chown {quoted_owner} -- \"$_cb_dest\" 2>/dev/null || true",
+        "  fi",
+        "fi",
+    ]
+
+
+def generate_heredoc_script(
+    file_paths,
+    file_contents_list,
+    append: bool = False,
+    metadata_list=None,
+) -> str:
+    """Generate a shell script using heredoc to create or append files.
+
+    On Linux, when per-file metadata is provided (or collectable), the script
+    also:
+
+    1. Verifies write access to the destination (or nearest existing parent)
+       and aborts with an error before writing if not writable.
+    2. After writing, ``chmod`` only if the pasting user owns the file or is root.
+    3. After writing, ``chown`` only if the original owner username exists.
+
+    Args:
+        file_paths: Destination paths used in the generated script.
+        file_contents_list: File contents as strings (parallel to paths).
+        append: If True, appends to files (>>); otherwise overwrites (>).
+        metadata_list: Optional parallel list of dicts from
+            :func:`get_linux_file_metadata` (keys: owner, group, mode).
+            Entries may be None. Ownership/mode restore is emitted only for
+            non-None entries (Linux capture). Write checks always run.
 
     Returns:
         Combined shell script text for recreating the files on a target system.
     """
     lines = ["#!/usr/bin/env bash"]
     redir = ">>" if append else ">"
-    for path, contents in zip(file_paths, file_contents_list):
+    n = len(file_paths)
+    meta = list(metadata_list) if metadata_list is not None else [None] * n
+    if len(meta) < n:
+        meta.extend([None] * (n - len(meta)))
+
+    for idx, (path, contents) in enumerate(zip(file_paths, file_contents_list)):
         delimiter = _choose_unique_heredoc_delimiter(contents)
         quoted_path = _shell_single_quote(path)
-        lines.append(f"mkdir -p \"$(dirname -- {quoted_path})\"")
+        file_meta = meta[idx]
+
+        # Abort before writing if the destination (or its parent) is not writable.
+        lines.extend(_emit_write_permission_check(quoted_path))
+
+        lines.append(f'mkdir -p -- "$(dirname -- {quoted_path})"')
         lines.append(f"cat {redir} {quoted_path} << '{delimiter}'")
         lines.append(contents)
         lines.append(delimiter)
+
+        # Ownership/mode restore only when Linux metadata was captured at copy time.
+        if file_meta:
+            lines.extend(
+                _emit_linux_perm_restore(
+                    quoted_path,
+                    file_meta["owner"],
+                    file_meta["group"],
+                    file_meta["mode"],
+                )
+            )
         lines.append("")
     return "\n".join(lines)
 
@@ -539,6 +658,7 @@ __all__ = [
     "install_dependencies",
     "copy_file_contents_to_clipboard",
     "copy_image_to_clipboard",
+    "get_linux_file_metadata",
     "generate_heredoc_script",
     "copy_to_clipboard",
     "get_file_stats",

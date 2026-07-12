@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-07-12
+### Added
+- Linux ownership and permission restoration in `-p`/`--append` heredoc paste scripts
+- Write-permission preflight in paste scripts (abort before writing if destination is not writable)
+- Grok Build / Skeleton Swarm agent scaffolding (`AGENTS.md`, `GROK.md`, `.grok/`, `.crules/`)
+
+### Changed
+- `project_spec.md` refreshed to match current CLI surface and packaging
+
 ## [1.9.1] - 2025-01-05
 ### Fixed
 - Fixed `UnicodeDecodeError` when processing files or stdin with non-UTF-8 encodings (e.g., UTF-16 with BOM)
@@ -19,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Directory discovery with `.gitignore` support
 - Recursive directory expansion with `-r/--recursive` flag
 - File entry dataclass for better file handling
+
 
 ## [1.8.0] - 2025-08-20
 ### Added
