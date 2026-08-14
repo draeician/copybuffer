@@ -21,12 +21,14 @@ A versatile command-line utility for copying file contents, directory contents, 
 - Python 3.x
 - pyperclip
 - PIL (for image support)
-- xclip or xsel (Linux only, requires an X11 DISPLAY)
+- xclip or xsel (Linux X11, preferred when `DISPLAY` is set and the tool works)
 - wl-clipboard (Wayland only)
+- A terminal that supports OSC 52, for SSH/remote sessions without a working graphical clipboard
 
-  On CachyOS/Hyprland systems, `wl-clipboard` is required. Wayland detection
-  checks for `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE=wayland`,
-  `HYPRLAND_INSTANCE_SIGNATURE`, or `SWAYSOCK`.
+  On CachyOS/Hyprland systems, `wl-clipboard` is preferred for native
+  clipboard access. Wayland detection checks for `WAYLAND_DISPLAY`,
+  `XDG_SESSION_TYPE=wayland`, `HYPRLAND_INSTANCE_SIGNATURE`, or `SWAYSOCK`.
+  If `wl-copy` is missing or fails, `auto` may fall back to OSC 52.
 
 ## Installation
 1. Install package with pipx:
@@ -87,7 +89,41 @@ cb --append path/to/file1.txt
 - `--append`: Use with `--paste` behavior to append to files instead of overwriting
 - `--image`: Include image files discovered when expanding directories
 - `--debug`: Enable debug mode
+- `--backend {auto,osc52,wayland,xclip,xsel}`: Select the text clipboard backend. Overrides `COPYBUFFER_BACKEND`. Default: `auto`
 - `--version`: Display application version
+
+### Clipboard backends (Linux text)
+
+`cb` copies text with an explicit backend. Images never use OSC 52.
+
+| Selection | How |
+|-----------|-----|
+| `--backend auto\|osc52\|wayland\|xclip\|xsel` | Command-line flag |
+| `COPYBUFFER_BACKEND=osc52` | Environment variable |
+
+The flag overrides the environment variable. `auto` is the default.
+
+**Automatic selection** prefers a native graphical backend when its environment and executable are present: Wayland (`wl-copy`) when a Wayland session is detected, otherwise `xclip` or `xsel` when `DISPLAY` is set *and the display looks reachable*. `DISPLAY` is only a hint — a value such as `localhost:12.0` does not prove X11 works. Copybuffer probes the X11 socket or TCP port (250ms) before running `xclip`, and caps graphical helpers at 2 seconds, so a dead SSH forward does not stall the command. If that graphical backend fails, `auto` falls back to OSC 52 when `/dev/tty` is writable. Explicit `xclip`, `xsel`, or `wayland` do not fall back; they fail with a nonzero exit status. Explicit `osc52` skips X11 and Wayland.
+
+```bash
+# Force OSC 52 (useful over SSH)
+cb --backend osc52 filename.txt
+printf 'test' | COPYBUFFER_BACKEND=osc52 cb
+```
+
+**OSC 52 over SSH.** Copybuffer encodes the text as UTF-8, then Base64, and writes this control sequence to `/dev/tty` (not stdout, so it still works at the end of a pipeline):
+
+```text
+ESC ] 52 ; c ; BASE64_DATA BEL
+```
+
+`SSH_TTY` is not required. The session needs a writable controlling terminal (`/dev/tty`). The local terminal emulator must allow OSC 52 clipboard writes (iTerm2, kitty, Alacritty, Windows Terminal, xterm with `allowWindowOps`, and others). tmux users typically need `set -s set-clipboard on`. Some terminals (notably many VTE-based ones) ignore OSC 52.
+
+**Payload size.** Copybuffer does not chunk OSC 52 payloads. Terminals and multiplexers often cap the sequence (commonly tens to hundreds of kilobytes; tmux, screen, and some emulators truncate or drop larger pastes). If a large copy appears truncated, use a native graphical backend or split the payload.
+
+**Security.** OSC 52 lets the application running in the terminal set the *local* clipboard. Over SSH that means a remote `cb` (or any remote program that emits the sequence) can overwrite clipboard contents on your workstation. Disable or restrict OSC 52 in the terminal if you do not trust the remote session, and avoid `--backend osc52` on untrusted hosts. Copybuffer's OSC 52 path is text-only; it will not place images on the clipboard that way.
+
+macOS and Windows keep the existing pyperclip/`pbcopy` behavior when `--backend auto` is used.
 
 ### Image Support
 Supports copying image files directly to clipboard. Image files are detected automatically
@@ -122,7 +158,7 @@ cb --debug filename.txt
 ```bash
 # Display version information
 cb --version
-# Output: copybuffer version 1.9.1
+# Output: copybuffer version 1.11.0
 ```
 
 ## Error Handling
@@ -169,9 +205,10 @@ cb -d -v -i /path/to/docs
 ## Troubleshooting
 If you encounter issues:
 1. Check dependencies with --debug flag
-2. Verify clipboard system access
+2. Verify clipboard system access (on Linux, try `--backend osc52` over SSH)
 3. Check file permissions
 4. Ensure proper Python version
+5. If `cb` prints success but paste is empty, upgrade past 1.10.0: that release could report success when `xclip` failed on a dead `DISPLAY`
 
 ## License
 This project is open source and available under the MIT License.

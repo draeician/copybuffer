@@ -56,9 +56,9 @@ Shortcut keywords (act as Manager, then follow `GIT_POLICY.md`):
 ## Hard boundaries
 
 1. Keep CLI surface stable: document any flag rename/removal as breaking.
-   Known flags include: file args, `-i/--include-header`, `-d/--directory`,
-   `-r` (recursive), `-v/--verbose`, `-a/--attachment` (Discord), `-p/--paste`
-   (heredoc), `--append`, `--debug`, `--version`.
+  Known flags include: file args, `-i/--include-header`, `-d/--directory`,
+  `-r` (recursive), `-v/--verbose`, `-a/--attachment` (Discord), `-p/--paste`
+  (heredoc), `--append`, `--debug`, `--backend`, `--version`.
 2. Do not repurpose `-a/--attachment` for append — use `--append` for heredoc append mode.
 3. Never use `pip install --break-system-packages`. Prefer `pipx`, project `.venv`,
    or `python3 -m copybuffer`.
@@ -67,8 +67,10 @@ Shortcut keywords (act as Manager, then follow `GIT_POLICY.md`):
    or multi-user daemon unless the user explicitly requests it and tasks cover it.
 6. Prefer list-form `subprocess` — never `shell=True`.
 7. Honor `.gitignore` when scanning directories (pathspec); do not copy ignored paths by default.
-8. Platform clipboard behavior: detect Wayland vs X11 correctly; require
-   `wl-clipboard` on Wayland and `xclip`/`xsel` on X11 with a display.
+8. Platform clipboard behavior: detect Wayland vs X11 correctly; prefer
+   `wl-clipboard` on Wayland and `xclip`/`xsel` on X11 when DISPLAY is set.
+   Treat DISPLAY as a hint, not proof. Linux `auto` text copy may fall back
+   to OSC 52 on `/dev/tty`. OSC 52 is text-only.
 
 ## Coding style (Python)
 

@@ -12,7 +12,7 @@ script generation for recreating files on paste.
 
 - **Package**: `copybuffer` (flat layout)
 - **CLI**: `cb` → `copybuffer.main:main` (also intended: `python -m copybuffer` once `__main__` exists)
-- **Version (master)**: `pyproject.toml` → `[project].version` (**1.9.0**)
+- **Version (master)**: `pyproject.toml` → `[project].version` (**1.11.0**)
 - **Runtime mirror**: `copybuffer.core.__VERSION__` (must match master)
 - **Author**: Draeician / Andrew Falgout — MIT License
 
@@ -52,6 +52,7 @@ script generation for recreating files on paste.
 | `-t, --tokens` | Show token statistics |
 | `--image` | Include images when expanding directories |
 | `--debug` | Debug logging |
+| `--backend` | Text clipboard backend: `auto`, `osc52`, `wayland`, `xclip`, `xsel` (overrides `COPYBUFFER_BACKEND`) |
 
 ### Usage examples
 
@@ -64,6 +65,7 @@ cb -a filename.txt
 cb -i filename.txt
 cb -p path/to/file1.txt path/to/file2.txt
 cb --append path/to/file1.txt
+cb --backend osc52 filename.txt
 cb image.png
 cb --version
 ```
@@ -75,8 +77,9 @@ cb --version
 | Language | Python 3.9+ (ruff target `py39`) |
 | Packaging | hatchling + `pyproject.toml` |
 | Runtime deps | `pyperclip`, `Pillow`, `tiktoken`, `pathspec` |
-| X11 clipboard | `xclip` or `xsel` + display |
+| X11 clipboard | `xclip` or `xsel` + display (DISPLAY is a hint, not proof) |
 | Wayland clipboard | `wl-clipboard` (`wl-copy`) |
+| Remote/SSH text clipboard | OSC 52 written to `/dev/tty` (text only) |
 | Dev deps | `pytest`, `pytest-cov`, `black`, `flake8` |
 | Install | `pipx install .` preferred |
 
@@ -97,6 +100,7 @@ tests/                # pytest
   test_heredoc.py
   test_images.py
   test_wayland.py
+  test_clipboard_backends.py
 AGENTS.md             # canonical multi-agent instructions
 GROK.md               # Grok entrypoint
 .grok/                # Grok rules + agent profiles

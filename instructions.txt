@@ -8,3 +8,69 @@ The code is good.  It's time to commit, which means first update the version, an
 
 ---
 Yes.. commit, merge, and push to origin.
+---
+Fix Copybuffer’s Linux remote-terminal clipboard handling and false-success behavior.
+
+Observed bug in Copybuffer 1.10.0:
+
+* The session had `DISPLAY=localhost:12.0`, but the X11 display was unusable because no authorization cookie was available.
+* Copybuffer treated the presence of `DISPLAY` as proof that X11 worked.
+* `pyperclip.copy()` selected `xclip`.
+* `xclip` printed `Error: Can't open display: localhost:12.0` and failed.
+* Copybuffer still printed `STDIN copied to the clipboard successfully!` and exited with status `0`.
+* Operating System Command 52 (OSC 52) worked correctly in the same terminal session.
+
+Reproduction:
+
+```bash
+export DISPLAY=localhost:12.0
+printf 'test' | cb
+echo "$?"
+```
+
+Current incorrect result:
+
+* `xclip` reports that it cannot open the display.
+* `cb` prints a success message.
+* Exit status is `0`.
+* The clipboard is unchanged.
+
+Implement the following:
+
+1. Correct failure propagation
+2. Add an OSC 52 text clipboard backend
+3. Make backend selection explicit and testable
+4. Improve automatic backend behavior
+5. Preserve existing functionality
+6. Add automated tests
+7. Documentation
+---
+There is a VERY long pause when I ran a simple echo pipe test.
+
+draeician@nomnom ~/git/personal/copybuffer (main) $ pipx upgrade copybuffer
+upgraded package copybuffer from 1.9.0 to 1.10.0
+draeician@nomnom ~/git/personal/copybuffer (main) $ echo "test" | cb
+
+STDIN copied to the clipboard successfully!
+---
+draeician@nomnom ~/git/personal/copybuffer (main) $ time echo "test" | cb
+STDIN copied to the clipboard successfully!
+
+real    0m2.086s
+user    0m0.073s
+sys     0m0.016s
+
+That should have been instant shouldn't it? It use to be.
+---
+Did you update the version number? pipx upgrade copybuffer says copybuffer is already at latest version 1.10.0
+---
+Okay.. commit and push.
+
+draeician@nomnom ~/git/personal/copybuffer (main) $ time echo "test" | cb
+STDIN copied to the clipboard successfully!
+
+real    0m0.097s
+user    0m0.078s
+sys     0m0.020s
+draeician@nomnom ~/git/personal/copybuffer (main) $ test
+

@@ -32,7 +32,7 @@ Until refactored, the existing `--version` store_true path that prints
 `copybuffer version {__VERSION__}` is acceptable — do not break it casually.
 
 Do not break the existing flag surface (`-i`, `-d`, `-r`, `-v`, `-a`, `-p`,
-`--append`, `--debug`, multi-file args) without a documented breaking change.
+`--append`, `--debug`, `--backend`, multi-file args) without a documented breaking change.
 
 ## Environment safety
 
@@ -50,7 +50,8 @@ Prefer list-form `subprocess` (never `shell=True`).
 
 1. `-a/--attachment` is Discord formatting only; append mode is `--append`.
 2. Directory scans honor `.gitignore` via pathspec by default.
-3. Wayland sessions need `wl-clipboard`; X11 needs `xclip` or `xsel` plus a display.
+3. Wayland sessions need `wl-clipboard`; X11 needs `xclip` or `xsel` plus a
+   display hint. Linux `auto` text copy may fall back to OSC 52; images must not.
 4. Heredoc generators must produce shell-safe output (quoting / unique delimiters).
 5. Image path goes through `copy_image_to_clipboard`; text through
    `copy_file_contents_to_clipboard` / heredoc helpers.

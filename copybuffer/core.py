@@ -1,17 +1,20 @@
+import base64
 import importlib.util
 import io
 import mimetypes
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 from PIL import Image
 import pyperclip
 
-__VERSION__ = "1.10.0"
+__VERSION__ = "1.11.0"
 
 
 def detect_encoding(data: bytes) -> Tuple[Union[str, None], bool]:
@@ -187,22 +190,38 @@ def is_xsel_installed():
     return shutil.which("xsel") is not None
 
 def has_display() -> bool:
-    """Return True if an X11 display is available."""
+    """Return True if DISPLAY is set to a nonempty value.
+
+    A set DISPLAY is only a hint that X11 *might* work. It does not prove
+    that the display is reachable or that an authorization cookie exists.
+    """
     return bool(os.environ.get("DISPLAY"))
+
+
+TEXT_BACKENDS = ("auto", "osc52", "wayland", "xclip", "xsel")
+CONTROLLING_TTY = "/dev/tty"
+# Dead SSH X11 forwards (DISPLAY=localhost:N.0) can block in XOpenDisplay
+# for tens of seconds. Probe first, then cap helper runtime.
+X11_PROBE_TIMEOUT = 0.25
+GRAPHICAL_BACKEND_TIMEOUT = 2.0
+
+
+class ClipboardError(Exception):
+    """Raised when a clipboard backend fails to copy text."""
+
 
 def is_pyperclip_installed():  # pragma: no cover
     return importlib.util.find_spec("pyperclip") is not None
 
 def check_dependencies():
-    missing_dependencies = []
+    """Return missing *hard* dependencies.
 
-    if is_wayland():
-        if not is_wlclipboard_installed():
-            missing_dependencies.append("wl-clipboard (wl-copy and wl-paste)")
-    elif not has_display():
-        missing_dependencies.append("DISPLAY environment variable")
-    elif not is_xclip_installed() and not is_xsel_installed():
-        missing_dependencies.append("xclip or xsel")
+    Linux graphical clipboard tools are preferred at copy time but are not
+    required: OSC 52 can still succeed over a writable controlling terminal.
+    ``DISPLAY`` is not treated as proof that X11 works, and its absence is
+    not a hard failure.
+    """
+    missing_dependencies = []
 
     if not is_pyperclip_installed():
         missing_dependencies.append("pyperclip")
@@ -215,13 +234,320 @@ def install_dependencies():  # pragma: no cover
     for dep in dependencies:
         print(f"- {dep}")
 
+
+def resolve_text_backend(
+    cli_backend: Optional[str] = None,
+    environ: Optional[dict] = None,
+) -> str:
+    """Resolve the text clipboard backend.
+
+    Command-line ``--backend`` takes precedence over ``COPYBUFFER_BACKEND``.
+    Unset or empty values default to ``auto``.
+
+    Args:
+        cli_backend: Value from ``--backend``, or None if the flag was omitted.
+        environ: Environment mapping; defaults to ``os.environ``.
+
+    Returns:
+        One of ``TEXT_BACKENDS``.
+
+    Raises:
+        ClipboardError: If the selected name is not a supported backend.
+    """
+    mapping = os.environ if environ is None else environ
+    if cli_backend is not None and str(cli_backend).strip() != "":
+        selected = str(cli_backend).strip().lower()
+    else:
+        selected = str(
+            mapping.get("COPYBUFFER_BACKEND", "auto") or "auto"
+        ).strip().lower()
+        if not selected:
+            selected = "auto"
+    if selected not in TEXT_BACKENDS:
+        raise ClipboardError(
+            f"Unknown clipboard backend '{selected}'. "
+            f"Choose from: {', '.join(TEXT_BACKENDS)}"
+        )
+    return selected
+
+
+def _tcp_port_open(host: str, port: int, timeout: float) -> bool:
+    """Return True if a TCP connect to ``host:port`` succeeds within timeout."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def x11_display_reachable(timeout: float = X11_PROBE_TIMEOUT) -> bool:
+    """Return whether DISPLAY looks like a reachable X11 server.
+
+    A set DISPLAY is not proof of a working server. Unix sockets are checked
+    with ``exists()``. TCP displays (typical SSH forwarding,
+    ``localhost:12.0``) get a short connect timeout so a dead tunnel cannot
+    stall ``cb`` inside ``xclip``.
+
+    Args:
+        timeout: Seconds to wait for a TCP connect.
+
+    Returns:
+        True if the display socket or TCP port appears reachable.
+    """
+    display = (os.environ.get("DISPLAY") or "").strip()
+    if not display:
+        return False
+    host, sep, rest = display.rpartition(":")
+    if not sep or not rest:
+        return False
+    display_num = rest.split(".", 1)[0]
+    try:
+        number = int(display_num)
+    except ValueError:
+        return False
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if not host or host == "unix":
+        return os.path.exists(f"/tmp/.X11-unix/X{number}")
+    return _tcp_port_open(host, 6000 + number, timeout)
+
+
+def preferred_linux_graphical_backend() -> Optional[str]:
+    """Return the preferred native Linux graphical backend, or None.
+
+    Wayland is preferred when its environment and ``wl-copy`` are present.
+    Otherwise ``DISPLAY`` is a hint to try ``xclip``, then ``xsel``, but
+    only when the display looks reachable.
+    """
+    if is_wayland() and shutil.which("wl-copy"):
+        return "wayland"
+    if has_display() and x11_display_reachable():
+        if shutil.which("xclip"):
+            return "xclip"
+        if shutil.which("xsel"):
+            return "xsel"
+    return None
+
+
+def build_osc52_sequence(text: str) -> str:
+    """Build an OSC 52 clipboard sequence for ``text``.
+
+    The payload is the original text encoded as UTF-8 bytes, then Base64.
+    Framing is ``ESC ] 52 ; c ; BASE64_DATA BEL`` with no extra spaces.
+
+    Args:
+        text: Clipboard text to encode.
+
+    Returns:
+        The OSC 52 control sequence as a Unicode string (ASCII payload).
+    """
+    encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    return f"\x1b]52;c;{encoded}\x07"
+
+
+def write_to_controlling_tty(data: str) -> None:
+    """Write ``data`` to the controlling terminal, not stdout.
+
+    OSC 52 must go to ``/dev/tty`` so the sequence still reaches the
+    terminal when ``cb`` is used at the end of a pipeline. ``SSH_TTY`` is
+    not required.
+
+    Args:
+        data: Text to write to the controlling terminal.
+
+    Raises:
+        ClipboardError: If the controlling terminal cannot be opened for writing.
+    """
+    try:
+        with open(CONTROLLING_TTY, "w", encoding="utf-8") as tty:
+            tty.write(data)
+            tty.flush()
+    except OSError as exc:
+        raise ClipboardError(
+            "OSC 52 backend failed: no writable controlling terminal at "
+            f"{CONTROLLING_TTY}"
+        ) from exc
+
+
+def _run_clipboard_command(backend: str, argv: Sequence[str], data: bytes) -> None:
+    """Run a clipboard helper and raise if it fails.
+
+    Do not use ``capture_output=True``. ``xclip`` and ``wl-copy`` daemonize
+    to own the selection and keep inherited pipes open, so waiting on those
+    pipes stalls until ``GRAPHICAL_BACKEND_TIMEOUT``. Stderr is copied to a
+    temp file instead so a failed helper can still be diagnosed.
+
+    Args:
+        backend: Backend name used in error messages.
+        argv: Command and arguments (list form, never ``shell=True``).
+        data: Bytes to send on stdin.
+
+    Raises:
+        ClipboardError: If the executable is missing, times out, or is nonzero.
+    """
+    try:
+        with tempfile.TemporaryFile() as err_file:
+            result = subprocess.run(
+                list(argv),
+                input=data,
+                stdout=subprocess.DEVNULL,
+                stderr=err_file,
+                check=False,
+                timeout=GRAPHICAL_BACKEND_TIMEOUT,
+            )
+            err_file.seek(0)
+            err = err_file.read().decode("utf-8", errors="replace").strip()
+    except subprocess.TimeoutExpired as exc:
+        raise ClipboardError(
+            f"{backend} backend failed: timed out after "
+            f"{GRAPHICAL_BACKEND_TIMEOUT}s waiting for the display"
+        ) from exc
+    except OSError as exc:
+        raise ClipboardError(f"{backend} backend failed: {exc}") from exc
+    if result.returncode != 0:
+        if err:
+            raise ClipboardError(f"{backend} backend failed: {err}")
+        raise ClipboardError(
+            f"{backend} backend failed with exit status {result.returncode}"
+        )
+
+
+def _copy_via_wayland(text: str) -> None:
+    if shutil.which("wl-copy") is None:
+        raise ClipboardError("wayland backend failed: wl-copy is not installed")
+    _run_clipboard_command("wayland", ["wl-copy"], text.encode("utf-8"))
+
+
+def _copy_via_xclip(text: str) -> None:
+    if shutil.which("xclip") is None:
+        raise ClipboardError("xclip backend failed: xclip is not installed")
+    _run_clipboard_command(
+        "xclip",
+        ["xclip", "-selection", "clipboard"],
+        text.encode("utf-8"),
+    )
+
+
+def _copy_via_xsel(text: str) -> None:
+    if shutil.which("xsel") is None:
+        raise ClipboardError("xsel backend failed: xsel is not installed")
+    _run_clipboard_command(
+        "xsel",
+        ["xsel", "--clipboard", "--input"],
+        text.encode("utf-8"),
+    )
+
+
+def _copy_via_osc52(text: str) -> None:
+    write_to_controlling_tty(build_osc52_sequence(text))
+
+
+def _copy_via_pyperclip(text: str) -> None:
+    try:
+        pyperclip.copy(text)
+    except pyperclip.PyperclipException as exc:
+        raise ClipboardError(f"pyperclip backend failed: {exc}") from exc
+
+
+def _copy_named_backend(backend: str, text: str) -> None:
+    if backend == "wayland":
+        _copy_via_wayland(text)
+    elif backend == "xclip":
+        _copy_via_xclip(text)
+    elif backend == "xsel":
+        _copy_via_xsel(text)
+    elif backend == "osc52":
+        _copy_via_osc52(text)
+    else:
+        raise ClipboardError(
+            f"Unknown clipboard backend '{backend}'. "
+            f"Choose from: {', '.join(TEXT_BACKENDS)}"
+        )
+
+
+def copy_text_to_clipboard(
+    text: str,
+    backend: str = "auto",
+    debug: bool = False,
+    platform: Optional[str] = None,
+) -> None:
+    """Copy text using the selected clipboard backend.
+
+    On Linux, ``auto`` prefers a native graphical backend when its
+    environment and executable are available. ``DISPLAY`` is only a hint;
+    if that backend fails, OSC 52 is tried when a controlling terminal is
+    writable. Explicit backends do not fall back. OSC 52 is text-only.
+
+    macOS and Windows ``auto`` keep the existing pyperclip path.
+
+    Args:
+        text: Text to place on the clipboard.
+        backend: One of ``TEXT_BACKENDS``.
+        debug: If True, print fallback diagnostics.
+        platform: Override ``sys.platform`` (tests).
+
+    Raises:
+        ClipboardError: If the selected backend fails and no fallback succeeds.
+    """
+    selected = (backend or "auto").strip().lower()
+    if selected not in TEXT_BACKENDS:
+        raise ClipboardError(
+            f"Unknown clipboard backend '{selected}'. "
+            f"Choose from: {', '.join(TEXT_BACKENDS)}"
+        )
+    backend = selected
+    plat = sys.platform if platform is None else platform
+
+    if backend != "auto":
+        _copy_named_backend(backend, text)
+        return
+
+    if not plat.startswith("linux"):
+        _copy_via_pyperclip(text)
+        return
+
+    graphical = preferred_linux_graphical_backend()
+    errors = []
+    if graphical:
+        try:
+            _copy_named_backend(graphical, text)
+            return
+        except ClipboardError as exc:
+            errors.append(str(exc))
+            if debug:
+                print(f"Debug: {exc}; falling back to OSC 52")
+    try:
+        _copy_via_osc52(text)
+    except ClipboardError as exc:
+        errors.append(str(exc))
+        raise ClipboardError("; ".join(errors)) from exc
+
+
 def copy_file_contents_to_clipboard(
     file_contents_list,
     include_header=False,
     discord_attachment=False,
     file_paths=None,
     debug=False,
+    backend: str = "auto",
 ):
+    """Combine file contents and copy the result to the clipboard.
+
+    Success is returned only when a clipboard backend actually succeeds.
+    Backend failures are captured and reported; a failed ``xclip`` process
+    is not treated as success.
+
+    Args:
+        file_contents_list: Text fragments to combine.
+        include_header: Prefix each fragment with a filename header.
+        discord_attachment: Wrap fragments in Discord attachment formatting.
+        file_paths: Parallel filenames for headers/attachments.
+        debug: Print combined contents while building the payload.
+        backend: Text clipboard backend (see ``TEXT_BACKENDS``).
+
+    Returns:
+        The combined text on success, or None if every backend failed.
+    """
     try:
         combined_contents = ""
         for i, file_contents in enumerate(file_contents_list):
@@ -238,31 +564,34 @@ def copy_file_contents_to_clipboard(
             if debug:
                 print(f"Debug: Combined contents so far:\n{combined_contents}")
 
-        pyperclip.copy(combined_contents)
+        copy_text_to_clipboard(combined_contents, backend=backend, debug=debug)
         if debug:
             print(f"Debug: Final combined contents copied to clipboard:\n{combined_contents}")
         return combined_contents
-    except pyperclip.PyperclipException:
-        if is_wayland():
-            print("Error: Install 'wl-clipboard' for Wayland clipboard support.")
-        elif not has_display():
-            print(
-                "Error: No DISPLAY environment variable. Ensure an X server is running or install wl-clipboard for Wayland."
-            )
-        else:
-            print("Error: No clipboard mechanism found. Install xclip or xsel.")
+    except ClipboardError as e:
+        print(f"Error: {e}")
         return None
     except Exception as e:
         print(f"Error: An unexpected error occurred. {str(e)}")
         return None
 
 
-def copy_image_to_clipboard(image_path):
+def copy_image_to_clipboard(image_path, backend: str = "auto"):
     """Copy an image file to the system clipboard.
-    
-    For GIF files (animated or static), preserves the original GIF format.
-    For other image formats, converts to PNG.
+
+    OSC 52 is text-only and is never used for images, including as a
+    fallback when a graphical backend fails.
+
+    Args:
+        image_path: Path to the image file.
+        backend: Text-backend selection from the CLI. ``osc52`` is rejected.
+            ``auto`` keeps the existing graphical cascade. Explicit
+            ``wayland`` / ``xclip`` / ``xsel`` use only that helper.
     """
+    if backend == "osc52":
+        print("Error: OSC 52 supports text only; cannot copy images.")
+        return False
+
     try:
         img = Image.open(image_path)
     except FileNotFoundError:
@@ -288,21 +617,38 @@ def copy_image_to_clipboard(image_path):
 
     try:
         if sys.platform.startswith("linux"):
-            if is_wayland() and shutil.which("wl-copy"):
-                subprocess.run(["wl-copy", "--type", mime_type], input=image_data, check=True)
+
+            def _run_image_cmd(argv):
+                subprocess.run(argv, input=image_data, check=True)
+
+            if backend == "wayland":
+                if not shutil.which("wl-copy"):
+                    print("Error: wayland backend failed: wl-copy is not installed")
+                    return False
+                _run_image_cmd(["wl-copy", "--type", mime_type])
+            elif backend == "xclip":
+                if not shutil.which("xclip"):
+                    print("Error: xclip backend failed: xclip is not installed")
+                    return False
+                _run_image_cmd(
+                    ["xclip", "-selection", "clipboard", "-t", mime_type]
+                )
+            elif backend == "xsel":
+                if not shutil.which("xsel"):
+                    print("Error: xsel backend failed: xsel is not installed")
+                    return False
+                _run_image_cmd(
+                    ["xsel", "--clipboard", "--input", "--mime-type", mime_type]
+                )
+            elif is_wayland() and shutil.which("wl-copy"):
+                _run_image_cmd(["wl-copy", "--type", mime_type])
             elif shutil.which("xclip"):
-                subprocess.run([
-                    "xclip",
-                    "-selection",
-                    "clipboard",
-                    "-t",
-                    mime_type,
-                ], input=image_data, check=True)
+                _run_image_cmd(
+                    ["xclip", "-selection", "clipboard", "-t", mime_type]
+                )
             elif shutil.which("xsel"):
-                subprocess.run(
-                    ["xsel", "--clipboard", "--input", "--mime-type", mime_type],
-                    input=image_data,
-                    check=True,
+                _run_image_cmd(
+                    ["xsel", "--clipboard", "--input", "--mime-type", mime_type]
                 )
             else:
                 print(
@@ -525,7 +871,7 @@ def copy_to_clipboard():  # pragma: no cover
         # Read from STDIN
         try:
             content, _ = read_stdin_with_encoding()
-            pyperclip.copy(content)
+            copy_text_to_clipboard(content)
         except Exception as e:
             print(f"Error copying from STDIN: {e}", file=sys.stderr)
             sys.exit(1)
@@ -533,7 +879,7 @@ def copy_to_clipboard():  # pragma: no cover
         # Existing file reading logic
         try:
             content, _ = read_with_encoding(sys.argv[1])
-            pyperclip.copy(content)
+            copy_text_to_clipboard(content)
         except FileNotFoundError:
             print(f"Error: File '{sys.argv[1]}' not found", file=sys.stderr)
             sys.exit(1)
@@ -653,9 +999,18 @@ __all__ = [
     "is_xclip_installed",
     "is_xsel_installed",
     "has_display",
+    "TEXT_BACKENDS",
+    "CONTROLLING_TTY",
+    "x11_display_reachable",
+    "ClipboardError",
     "is_pyperclip_installed",
     "check_dependencies",
     "install_dependencies",
+    "resolve_text_backend",
+    "preferred_linux_graphical_backend",
+    "build_osc52_sequence",
+    "write_to_controlling_tty",
+    "copy_text_to_clipboard",
     "copy_file_contents_to_clipboard",
     "copy_image_to_clipboard",
     "get_linux_file_metadata",
@@ -665,4 +1020,3 @@ __all__ = [
     "format_file_stats",
     "encoding",
 ]
-

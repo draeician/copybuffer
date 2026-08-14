@@ -29,7 +29,10 @@ Apply on any `*.py` edit under this repository.
 
 ## Domain-specific
 
-- Clipboard backends: Wayland (`wl-clipboard` / `wl-copy`) vs X11 (`xclip`/`xsel` via pyperclip).
+- Clipboard backends: Linux text uses `--backend` / `COPYBUFFER_BACKEND`
+  (`auto`, `osc52`, `wayland`, `xclip`, `xsel`). `auto` prefers Wayland
+  (`wl-copy`) or X11 (`xclip`/`xsel`) and falls back to OSC 52 on `/dev/tty`.
+  Do not use OSC 52 for images. macOS/Windows `auto` stays on pyperclip.
 - Wayland detection: `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE=wayland`,
   `HYPRLAND_INSTANCE_SIGNATURE`, or `SWAYSOCK`.
 - Directory discovery: honor `.gitignore` via pathspec; optional recursion (`-r`).

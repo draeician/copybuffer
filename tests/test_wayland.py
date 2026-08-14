@@ -1,5 +1,4 @@
 from pathlib import Path
-import pyperclip
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -31,27 +30,30 @@ def test_is_wlclipboard_installed(monkeypatch):
     assert core.is_wlclipboard_installed()
 
 
-def test_check_dependencies_wayland_missing(monkeypatch):
+def test_check_dependencies_wayland_missing_is_not_hard(monkeypatch):
     monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
     monkeypatch.setattr(core, "is_wlclipboard_installed", lambda: False)
+    monkeypatch.setattr(core, "is_pyperclip_installed", lambda: True)
     deps = core.check_dependencies()
-    assert "wl-clipboard (wl-copy and wl-paste)" in deps
+    assert deps == []
 
 
 def test_check_dependencies_wayland_present(monkeypatch):
     monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
     monkeypatch.setattr(core, "is_wlclipboard_installed", lambda: True)
+    monkeypatch.setattr(core, "is_pyperclip_installed", lambda: True)
     deps = core.check_dependencies()
     assert "wl-clipboard" not in "".join(deps)
 
 
-def test_check_dependencies_xclip_missing(monkeypatch):
+def test_check_dependencies_xclip_missing_is_not_hard(monkeypatch):
     monkeypatch.setattr(core, "is_wayland", lambda: False)
     monkeypatch.setattr(core, "is_xclip_installed", lambda: False)
     monkeypatch.setattr(core, "is_xsel_installed", lambda: False)
+    monkeypatch.setattr(core, "is_pyperclip_installed", lambda: True)
     monkeypatch.setenv("DISPLAY", ":1")
     deps = core.check_dependencies()
-    assert deps == ["xclip or xsel"]
+    assert deps == []
 
 
 def test_check_dependencies_missing_pyperclip(monkeypatch):
@@ -64,22 +66,24 @@ def test_check_dependencies_missing_pyperclip(monkeypatch):
     assert deps == ["pyperclip"]
 
 
-def test_check_dependencies_missing_display(monkeypatch):
+def test_check_dependencies_missing_display_is_not_hard(monkeypatch):
     monkeypatch.setattr(core, "is_wayland", lambda: False)
     monkeypatch.setattr(core, "is_xclip_installed", lambda: True)
     monkeypatch.setattr(core, "is_xsel_installed", lambda: True)
+    monkeypatch.setattr(core, "is_pyperclip_installed", lambda: True)
     monkeypatch.delenv("DISPLAY", raising=False)
     deps = core.check_dependencies()
-    assert "DISPLAY environment variable" in deps
+    assert deps == []
+    assert "DISPLAY" not in "".join(deps)
 
 
 def test_copy_file_contents_success(monkeypatch):
     captured = {}
 
-    def fake_copy(text):
+    def fake_copy(text, backend="auto", debug=False):
         captured["text"] = text
 
-    monkeypatch.setattr(pyperclip, "copy", fake_copy)
+    monkeypatch.setattr(core, "copy_text_to_clipboard", fake_copy)
     result = core.copy_file_contents_to_clipboard(
         ["hello"],
         include_header=True,
@@ -92,29 +96,7 @@ def test_copy_file_contents_success(monkeypatch):
     assert result
 
 
-def test_copy_file_contents_wayland_error(monkeypatch, capsys):
-    def raising_copy(_):
-        raise pyperclip.PyperclipException()
-
-    monkeypatch.setattr(pyperclip, "copy", raising_copy)
-    monkeypatch.setattr(core, "is_wayland", lambda: True)
-    core.copy_file_contents_to_clipboard(["data"])
-    assert "wl-clipboard" in capsys.readouterr().out
-
-
-def test_copy_file_contents_no_display(monkeypatch, capsys):
-    def raising_copy(_):
-        raise pyperclip.PyperclipException()
-
-    monkeypatch.setattr(pyperclip, "copy", raising_copy)
-    monkeypatch.setattr(core, "is_wayland", lambda: False)
-    monkeypatch.delenv("DISPLAY", raising=False)
-    core.copy_file_contents_to_clipboard(["data"])
-    assert "DISPLAY" in capsys.readouterr().out
-
-
 def test_is_xclip_and_xsel_installed(monkeypatch):
     monkeypatch.setattr(core.shutil, "which", lambda cmd: "/usr/bin/" + cmd)
     assert core.is_xclip_installed()
     assert core.is_xsel_installed()
-

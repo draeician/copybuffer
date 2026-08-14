@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-08-13
+### Added
+- Linux OSC 52 text clipboard backend (writes to `/dev/tty`, not stdout)
+- `--backend auto|osc52|wayland|xclip|xsel` and `COPYBUFFER_BACKEND` (CLI wins)
+
+### Fixed
+- Linux clipboard copy no longer reports success when `xclip`/`xsel`/`wl-copy` fails
+- `DISPLAY` is treated as a hint, not proof that X11 is usable
+- Failed graphical backends fall back to OSC 52 in `auto` mode
+- Clipboard backend failure now exits with a nonzero status
+- Unreachable X11 (`DISPLAY=localhost:N`) is skipped after a short TCP probe instead of blocking in `xclip`
+- `xclip`/`wl-copy` success no longer stalls ~2s waiting on daemonized helper pipes
+
+### Changed
+- Linux text copy uses explicit backends instead of `pyperclip.copy()` so subprocess failures propagate
+- Missing `DISPLAY` or graphical clipboard tools is no longer a hard startup failure on Linux
+
 ## [1.10.0] - 2026-07-12
 ### Added
 - Linux ownership and permission restoration in `-p`/`--append` heredoc paste scripts

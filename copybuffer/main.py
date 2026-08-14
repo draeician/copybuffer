@@ -1,11 +1,9 @@
 import argparse
 import mimetypes
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-import pyperclip
 import tiktoken
 from pathspec import PathSpec
 
@@ -17,9 +15,11 @@ DEFAULT_IGNORE_PATTERNS = [
 
 from .core import (
     __VERSION__,
+    ClipboardError,
     check_dependencies,
     copy_file_contents_to_clipboard,
     copy_image_to_clipboard,
+    copy_text_to_clipboard,
     generate_heredoc_script,
     get_file_stats,
     format_file_stats,
@@ -28,6 +28,7 @@ from .core import (
     encoding,
     read_stdin_with_encoding,
     read_with_encoding,
+    resolve_text_backend,
 )
 
 
@@ -195,7 +196,10 @@ def discover_files(
 
 def main():  # pragma: no cover
     parser = argparse.ArgumentParser(
-        description="Copy file contents, images, or STDIN input to clipboard."
+        description=(
+            "Copy file contents, images, or STDIN input to clipboard. "
+            "On Linux, text copy can use a native graphical backend or OSC 52."
+        )
     )
     parser.add_argument("--version", action="store_true", help="Display the application version.")
     parser.add_argument(
@@ -240,6 +244,17 @@ def main():  # pragma: no cover
         "--image", action="store_true", help="Include image files discovered in directories"
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument(
+        "--backend",
+        choices=["auto", "osc52", "wayland", "xclip", "xsel"],
+        default=None,
+        help=(
+            "Text clipboard backend: auto, osc52, wayland, xclip, or xsel. "
+            "Overrides COPYBUFFER_BACKEND. auto prefers a native graphical "
+            "backend when available and falls back to OSC 52 (text only) if "
+            "that backend fails. Explicit backends do not fall back."
+        ),
+    )
     args = parser.parse_args()
 
     # Check dependencies before proceeding
@@ -249,17 +264,23 @@ def main():  # pragma: no cover
         for dep in missing_dependencies:
             print(f"- {dep}")
         install_dependencies()
-        return
+        return 1
 
     if args.version:
         print(f"copybuffer version {__VERSION__}")
-        return
+        return 0
+
+    try:
+        backend = resolve_text_backend(args.backend)
+    except ClipboardError as exc:
+        print(f"Error: {exc}")
+        return 1
 
     # If no files provided, check STDIN
     if not args.files:
         if args.paste or args.append:
             print("Error: --paste/--append require file paths to determine output destinations.")
-            return
+            return 1
         try:
             content, detected_encoding = read_stdin_with_encoding()
             content = content.strip()
@@ -267,7 +288,7 @@ def main():  # pragma: no cover
                 print(f"Debug: Read from STDIN (encoding: {detected_encoding}): {content}")
         except Exception as e:
             print(f"Error reading from STDIN: {e}")
-            return
+            return 1
         
         # Handle token counting for STDIN
         if args.tokens:
@@ -306,17 +327,24 @@ def main():  # pragma: no cover
             print('\n'.join(output))
         
         combined_contents = copy_file_contents_to_clipboard(
-            [content], args.include_header, args.attachment, debug=args.debug
+            [content],
+            args.include_header,
+            args.attachment,
+            debug=args.debug,
+            backend=backend,
         )
-        if combined_contents:
+        if combined_contents is not None:
             print("STDIN copied to the clipboard successfully!")
             if args.verbose:
                 print("Copied contents:\n" + combined_contents)
-        return
+            return 0
+        return 1
 
     text_entries, image_entries, missing, directory_errors = discover_files(
         args.files, args.directory, args.recursive, args.image, debug=args.debug
     )
+
+    exit_code = 0
 
     for missing_path in missing:
         print(f"Error: File '{missing_path}' not found")
@@ -348,13 +376,20 @@ def main():  # pragma: no cover
         if args.debug:
             print(f"Debug: Read file {entry.abs_path}")
 
+    image_success = False
+    image_attempted = False
     for image_entry in image_entries:
+        image_attempted = True
         if args.debug:
             print(f"Debug: Processing image {image_entry.abs_path}")
-        if copy_image_to_clipboard(str(image_entry.abs_path)):
+        if copy_image_to_clipboard(str(image_entry.abs_path), backend=backend):
+            image_success = True
             print(
                 f"Image '{image_entry.display_path}' copied to clipboard successfully!"
             )
+
+    if image_attempted and not image_success and not file_contents_list:
+        exit_code = 1
 
     if file_contents_list:
         if args.paste or args.append:
@@ -369,12 +404,16 @@ def main():  # pragma: no cover
                 metadata_list=metadata_list,
             )
             try:
-                pyperclip.copy(script_text)
+                copy_text_to_clipboard(script_text, backend=backend, debug=args.debug)
                 if args.verbose:
                     print("Copied heredoc script:\n" + script_text)
                 print("Heredoc script copied to clipboard successfully!")
+            except ClipboardError as e:
+                print(f"Error: {e}")
+                exit_code = 1
             except Exception as e:
                 print(f"Error: An unexpected error occurred. {str(e)}")
+                exit_code = 1
         else:
             combined_contents = copy_file_contents_to_clipboard(
                 file_contents_list,
@@ -382,16 +421,19 @@ def main():  # pragma: no cover
                 args.attachment,
                 valid_file_paths,
                 args.debug,
+                backend=backend,
             )
-            if combined_contents:
+            if combined_contents is not None:
                 print("Files copied to clipboard successfully!")
                 if args.verbose:
                     print("Copied contents:\n" + combined_contents)
+            else:
+                exit_code = 1
 
     all_entries = text_entries + image_entries
     if args.tokens:
         if not all_entries:
-            return
+            return exit_code
         enc = tiktoken.get_encoding(encoding)
         for entry in all_entries:
             try:
@@ -409,7 +451,9 @@ def main():  # pragma: no cover
                 print(f"Error: File '{entry.display_path}' not found")
             except Exception as e:
                 print(f"Error processing {entry.display_path}: {e}")
-        return
+        return exit_code
+
+    return exit_code
 
 
 __all__ = ["main", "discover_files"]

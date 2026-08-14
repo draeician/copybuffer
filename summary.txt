@@ -1,6 +1,12 @@
 Project summary:
-- CLI clipboard utility (cb) for files/STDIN/images; package copybuffer 1.9.0
+- CLI clipboard utility (cb) for files/STDIN/images; package copybuffer 1.11.0
 - Features: headers, Discord -a, heredoc -p/--append, recursive -r, tokens -t, Wayland
+- Linux text copy: explicit backends (auto/osc52/wayland/xclip/xsel) via --backend and COPYBUFFER_BACKEND
+- DISPLAY is a hint, not proof of X11; unreachable displays are skipped after a short TCP probe
+- Failed graphical backends fall back to OSC 52 on /dev/tty; helpers time out after 2s
+- Graphical helpers do not use captured pipes, so daemonized xclip/wl-copy cannot stall cb
+- Success messages and exit status follow actual backend results (no false success on xclip failure)
+- OSC 52 is text-only; images stay on native graphical backends
 - Grok Build initialized (2026-07-12): AGENTS.md, GROK.md, .grok/{rules,agents}, .crules/
 - Legacy .codex/ retained; prefer .crules + .grok for new agent work
 - project_spec.md refreshed to match real CLI/packaging; now trackable in git
