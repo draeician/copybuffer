@@ -354,6 +354,54 @@ def test_auto_without_display_uses_osc52(monkeypatch, tmp_path):
     assert tty.read_text(encoding="utf-8") == core.build_osc52_sequence("ssh-text")
 
 
+def test_auto_osc52_fallback_warns_on_stderr(monkeypatch, tmp_path, capsys):
+    _clear_wayland(monkeypatch)
+    _point_tty(monkeypatch, tmp_path)
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.setattr(core.shutil, "which", _which_only("xclip"))
+    core.copy_text_to_clipboard("ssh-text", backend="auto")
+    captured = capsys.readouterr()
+    assert "falling back to OSC 52" in captured.err
+    assert captured.out == ""
+
+
+def test_auto_graphical_failure_warns_on_stderr(monkeypatch, tmp_path, capsys):
+    _clear_wayland(monkeypatch)
+    _force_x11_reachable(monkeypatch, True)
+    _point_tty(monkeypatch, tmp_path)
+    monkeypatch.setenv("DISPLAY", "localhost:12.0")
+    monkeypatch.setattr(core.shutil, "which", _which_only("xclip"))
+
+    def fake_run(argv, **kwargs):
+        return _completed(argv, 1, stderr=b"Error: Can't open display\n")
+
+    monkeypatch.setattr(core.subprocess, "run", fake_run)
+    core.copy_text_to_clipboard("after-failure", backend="auto")
+    captured = capsys.readouterr()
+    assert "falling back to OSC 52" in captured.err
+    assert captured.out == ""
+
+
+def test_explicit_osc52_does_not_warn(monkeypatch, tmp_path, capsys):
+    _clear_wayland(monkeypatch)
+    _point_tty(monkeypatch, tmp_path)
+    monkeypatch.delenv("DISPLAY", raising=False)
+    core.copy_text_to_clipboard("explicit", backend="osc52")
+    captured = capsys.readouterr()
+    assert captured.err == ""
+
+
+def test_successful_graphical_does_not_warn(monkeypatch, tmp_path, capsys):
+    _clear_wayland(monkeypatch)
+    _force_x11_reachable(monkeypatch, True)
+    _point_tty(monkeypatch, tmp_path)
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.setattr(core.shutil, "which", _which_only("xclip"))
+    monkeypatch.setattr(core.subprocess, "run", _run_with_stderr(0))
+    core.copy_text_to_clipboard("ok", backend="auto")
+    assert capsys.readouterr().err == ""
+
+
 def test_macos_auto_uses_pyperclip(monkeypatch):
     copied = {}
 

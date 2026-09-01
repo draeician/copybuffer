@@ -14,7 +14,7 @@ from typing import Optional, Sequence, Tuple, Union
 from PIL import Image
 import pyperclip
 
-__VERSION__ = "1.11.0"
+__VERSION__ = "1.11.1"
 
 
 def detect_encoding(data: bytes) -> Tuple[Union[str, None], bool]:
@@ -442,6 +442,21 @@ def _copy_via_osc52(text: str) -> None:
     write_to_controlling_tty(build_osc52_sequence(text))
 
 
+def _warn_osc52_fallback(errors: Sequence[str]) -> None:
+    """Warn on stderr that ``auto`` fell back to OSC 52.
+
+    OSC 52 requires terminal support; on terminals that ignore the
+    sequence the clipboard is silently left unchanged. Writing to stderr
+    keeps the warning visible even when stdout is redirected.
+    """
+    prefix = f"{errors[0]} " if errors else ""
+    print(
+        f"Warning: {prefix}falling back to OSC 52; your terminal must "
+        "support OSC 52 or the clipboard will not be updated.",
+        file=sys.stderr,
+    )
+
+
 def _copy_via_pyperclip(text: str) -> None:
     try:
         pyperclip.copy(text)
@@ -516,6 +531,7 @@ def copy_text_to_clipboard(
             errors.append(str(exc))
             if debug:
                 print(f"Debug: {exc}; falling back to OSC 52")
+    _warn_osc52_fallback(errors)
     try:
         _copy_via_osc52(text)
     except ClipboardError as exc:

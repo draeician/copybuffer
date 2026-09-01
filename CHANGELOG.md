@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2026-09-01
+### Fixed
+- `auto` backend now warns on stderr when it falls back to OSC 52, so the
+  fallback is visible even when stdout is redirected and no longer claims
+  success on terminals that do not support OSC 52.
+
 ## [1.11.0] - 2026-08-13
 ### Added
 - Linux OSC 52 text clipboard backend (writes to `/dev/tty`, not stdout)

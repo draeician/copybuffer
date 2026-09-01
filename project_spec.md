@@ -12,7 +12,7 @@ script generation for recreating files on paste.
 
 - **Package**: `copybuffer` (flat layout)
 - **CLI**: `cb` → `copybuffer.main:main` (also intended: `python -m copybuffer` once `__main__` exists)
-- **Version (master)**: `pyproject.toml` → `[project].version` (**1.11.0**)
+- **Version (master)**: `pyproject.toml` → `[project].version` (**1.11.1**)
 - **Runtime mirror**: `copybuffer.core.__VERSION__` (must match master)
 - **Author**: Draeician / Andrew Falgout — MIT License
 
